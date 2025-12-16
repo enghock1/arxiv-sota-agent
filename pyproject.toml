@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sota_agent"
+version = "0.1.0"
+description = "A Pydantic-based agent to extract SOTA metrics and create taxonomy from arxiv archived papers."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+  {name = "Eng Hock Lee"}
+]
+dependencies = [
+    "google-cloud-aiplatform",
+    "pydantic>=2.0",
+    "pandas",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",  
+    "flake8"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
