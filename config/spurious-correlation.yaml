@@ -1,0 +1,16 @@
+benchmark_name: "Spurious Correlation Benchmark"
+
+target_dataset:
+  name: "Waterbirds"
+  keywords: ["Waterbirds", "spurious correlation", "worst-group", "robustness", "distribution"]
+
+taxonomy:
+  stages: 
+    - "Data-Centric" # data augmentation, balancing, reweighting
+    - "Representation Learning" # invariant learning, contrastive learning, feature disentanglement
+    - "Post-hoc Methods" # finetuning, ensemble learning, calibration
+    - "Others"
+
+extraction_goals:
+  primary_metric: "Worst-Group Accuracy"
+  primary_metric_description: "Lowest accuracy across anny subgroup."
