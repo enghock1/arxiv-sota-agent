@@ -1,8 +1,11 @@
+MAX_SCAN_LIMIT: -1   # maximum number of papers to scan from the arxiv dataset. -1 = no limit
+MAX_LLM_CALLS: 100   # maximum number of LLM calls. -1 = no limit
+
 benchmark_name: "Spurious Correlation Benchmark"
 
 target_dataset:
   name: "Waterbirds"
-  keywords: ["Waterbirds", "spurious correlation", "worst-group", "robustness", "distribution"]
+  keywords: ["Waterbirds", "spurious correlation", "worst-group", "Confounding"]
 
 taxonomy:
   stages: 
