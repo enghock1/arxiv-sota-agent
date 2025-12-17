@@ -99,18 +99,20 @@ def main(config_path: str):
     for paper in tqdm(papers_to_process, desc="Extracting", unit="papers"):
         try:
             # agent call
-            entry = client.analyze_paper(paper['abstract'], config)
+            entry = client.analyze_paper(paper['title'], paper['abstract'], config)
+            print(f"Extracted Entry: {entry}\n")
             
             if entry and entry.metric_value is not None:
                 results.append({
                     "Method": entry.method_name,
-                    "Pipeline Stage": entry.taxonomy.pipeline,
-                    "Strategy": entry.taxonomy.strategy,
+                    "Pipeline Stage": entry.pipeline,
+                    "Strategy": entry.strategy,
                     "Metric": entry.metric_value,
-                    "Paper Title": entry.paper_title,
-                    "Paper ID": paper.get('id', 'N/A')
+                    "Evidence": entry.evidence,
+                    "Dataset Mentioned": entry.dataset_mentioned,
+                    "Paper Title": entry.paper_title
                 })
-                time.sleep(0.5) 
+                time.sleep(0.1) 
                 
         except Exception as e:
             # catch exceptions
@@ -125,7 +127,7 @@ def main(config_path: str):
         df.to_csv(output_file, index=False)
         
         print("\leaderboard")
-        print(df[["Method", "Metric", "Pipeline Stage", "Strategy"]].head(20).to_markdown(index=False))
+        print(df[["Method", "Pipeline Stage", "Strategy", "Dataset Mentioned", "Evidence", "Metric"]].head(20).to_markdown(index=False))
         print(f"\nSaved to {output_file}")
     else:
         print("\nNo valid metrics extracted from candidates.")

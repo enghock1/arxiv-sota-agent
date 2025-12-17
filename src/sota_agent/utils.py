@@ -49,4 +49,4 @@ def filter_paper(paper: Dict, target_dataset_config: Dict) -> bool:
 
 
     # Returns True if ANY keyword is found
-    return any(keyword in abstract for keyword in keywords)
+    return all(keyword in abstract for keyword in keywords)

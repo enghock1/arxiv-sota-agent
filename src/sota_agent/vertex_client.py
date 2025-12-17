@@ -21,7 +21,7 @@ class AgentClient:
         # Use Gemini 2.5 Flash for best instruction following
         self.model = GenerativeModel("gemini-2.5-flash")
         
-    def analyze_paper(self, abstract: str, config: Dict[str, Any]) -> Optional[SOTAEntry]:
+    def analyze_paper(self, title: str, abstract: str, config: Dict[str, Any]) -> Optional[SOTAEntry]:
         """
         Analyzes the paper abstract using parameters defined in the YAML config.
         """
@@ -33,30 +33,31 @@ class AgentClient:
         
         # Extract Valid Stages (The Strict Constraints)
         # We join them into a string to show the LLM its options
-        valid_stages = config['taxonomy']['stages']
+        valid_stages = config['pipeline_stages']
         stages_str = ", ".join([f"'{s}'" for s in valid_stages])
         
         # Construct the System Prompt
-        # We explicitly tell the LLM that 'pipeline' MUST be one of the values from the YAML
         system_prompt = f"""
-        You are an expert AI Researcher constructing a State-of-the-Art (SOTA) Leaderboard.
-        
-        TARGET DATASET: {dataset_name}
-        TARGET METRIC: {metric_name}
-        METRIC DEFINITION: {metric_desc}
-        
-        --- CLASSIFICATION RULES ---
+        You are an automated Data Extraction Agent. Your goal is to extract state-of-the-Art (SOTA) leaderboard data.
+
+        --- TARGETS ---
+        DATASET: {dataset_name}
+        METRIC: {metric_name} ({metric_desc})
+
+        --- ALLOWED STAGES ---
         You must classify the method into one of these strict Pipeline Stages:
-        [{stages_str}]
-        
-        For the 'strategy' field, provide a specific 2-3 word description of the technique (e.g., 'Data Augmentation', 'Invariant Learning', 'Finetuning').
-        
-        --- EXTRACTION RULES ---
-        1. Extract the specific 'Method Name' (acronym).
-        2. Extract the numeric value for {metric_name} on {dataset_name}.
-        3. If the paper mentions {dataset_name} but does not report the number, set metric_value to null.
-        4. If the paper does not evaluate on {dataset_name} at all, set dataset_mentioned to false.
+        {stages_str}
+
+        --- INSTRUCTIONS ---
+        1. **method_name**: Prefer the acronym. If none, use the shortest distinct name.
+        2. **metric_value**: Extract the exact numeric value for {metric_name}.
+            - If the text says "85.5%", return 0.855.
+            - If not reported, set to null.
+        3. **evidence**: You MUST provide a direct, verbatim quote from the abstract that supports the extracted metric.
+        4. **dataset_mentioned**: specific check if {dataset_name} is explicitly tested.
+
         """
+
 
         # 4. Enforce JSON Output using the Pydantic Schema
         generation_config = GenerationConfig(
@@ -75,7 +76,7 @@ class AgentClient:
 
         try:
             response = self.model.generate_content(
-                f"{system_prompt}\n\nABSTRACT:\n{abstract}",
+                f"{system_prompt}\n\nTITLE:\n{title}\n\nABSTRACT:\n{abstract}",
                 generation_config=generation_config,
                 safety_settings=safety_settings
             )
