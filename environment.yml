@@ -20,5 +20,6 @@ dependencies:
   - aiohttp
   - pyyaml
   - pytest
+  - tabulate
   - pip:
     - docstring_parser
