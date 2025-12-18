@@ -1,6 +1,4 @@
-from typing import Optional
 from pydantic import BaseModel, Field, field_validator
-    
 
 class SOTAEntry(BaseModel):
     paper_title: str = Field(..., description="Title of the research paper.")
@@ -8,15 +6,14 @@ class SOTAEntry(BaseModel):
     pipeline: str = Field(..., description="taxonomy pipeline stage specified in yaml config.")
     strategy: str = Field(..., description="specific algorithmic strategy used in each stage.")
     evidence: str = Field(..., description=" Quote from text supporting the metric.")
-    dataset_mentioned: bool
-    metric_value: float = Field(None, description="Performance metric. Return -1.0 if not reported.")
+    dataset_mentioned: bool = Field(..., description="Indicates if the dataset is mentioned in the paper.")
+    metric_value: float = Field(..., description="Performance metric. Return -1.0 if not reported.")
 
     # cleaning function to force consistent formatting on pipeline, strategy, abd metric_value fields
     @field_validator('pipeline', mode='before')
     @classmethod
     def clean_pipeline(cls, v: str) -> str:
         return v.strip().title()
-
 
     @field_validator('strategy', mode='before')
     @classmethod

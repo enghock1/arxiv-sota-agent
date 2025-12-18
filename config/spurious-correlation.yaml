@@ -1,11 +1,32 @@
+benchmark_name: "Spurious Correlation Benchmark"
+
+### Arxiv paper filtering step 
+arxiv_metadata_filters:
+  # Only allow these arxiv categories
+  allowed_categories: ["cs.LG", "stat.ML", "cs.AI"]
+  
+  # Filter out old papers
+  min_date: "2015-01-01"
+  
+  # Exclude papers that sound like surveys or reviews
+  exclude_title_keywords: 
+    - "survey"
+    - "review"
+    - "comprehensive"
+  
+  # Is the paper published? (by checking if doi exist)
+  is_published: false
+
+  abstract_keywords:
+    - "spurious correlation"
+  
+
+
 MAX_SCAN_LIMIT: -1   # maximum number of papers to scan from the arxiv dataset. -1 = no limit
 MAX_LLM_CALLS: 2   # maximum number of LLM calls. -1 = no limit
 
-benchmark_name: "Spurious Correlation Benchmark"
-
 target_dataset:
   name: "Waterbirds"
-  keywords: ["spurious correlation"]
 
 pipeline_stages: 
   - "Data-Centric" # data augmentation, balancing, reweighting

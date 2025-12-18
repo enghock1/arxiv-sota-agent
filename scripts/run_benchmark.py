@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import json
 import argparse
 import pandas as pd
 from tqdm import tqdm
@@ -8,8 +9,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from sota_agent.vertex_client import AgentClient
-from sota_agent.utils import load_config, stream_arxiv_data, filter_paper
-import json
+from sota_agent.utils.filter import filter_arxiv_metadata
+from sota_agent.utils.data_ingest import load_config, stream_arxiv_data
 
 # root path setup
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -20,7 +21,7 @@ CONSTANTS = {
 
 def main(config_path: str):
 
-    # Check provate env variables
+    # get google project id from .env
     load_dotenv()
     project_id = os.getenv("GOOGLE_PROJECT_ID")
     print(f"Google project id used: {project_id}")
@@ -48,7 +49,7 @@ def main(config_path: str):
             if config["MAX_SCAN_LIMIT"] != -1 and scanned_count >= config["MAX_SCAN_LIMIT"]:
                 break
                 
-            if filter_paper(paper, config['target_dataset']):
+            if filter_arxiv_metadata(paper, config):
                 candidates.append(paper)
                 pbar.set_postfix({"Found": len(candidates)})
             
@@ -59,6 +60,8 @@ def main(config_path: str):
         sys.exit(1)
 
     print(f"\nScan Complete. Scanned: {scanned_count:,}. Candidates Found: {len(candidates)}")
+
+    quit()
 
     if not candidates:
         print("No candidates found. Try broadening keywords.")
@@ -126,7 +129,7 @@ def main(config_path: str):
         output_file = CONSTANTS['OUTPUT'] / "leaderboard.csv"
         df.to_csv(output_file, index=False)
         
-        print("\leaderboard")
+        print("leaderboard")
         print(df[["Method", "Pipeline Stage", "Strategy", "Dataset Mentioned", "Evidence", "Metric"]].head(20).to_markdown(index=False))
         print(f"\nSaved to {output_file}")
     else:
