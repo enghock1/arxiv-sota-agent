@@ -21,5 +21,6 @@ dependencies:
   - pyyaml
   - pytest
   - tabulate
+  - python-dotenv
   - pip:
     - docstring_parser
