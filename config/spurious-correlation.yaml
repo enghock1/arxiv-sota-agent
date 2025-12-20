@@ -1,6 +1,6 @@
 benchmark_name: "Spurious Correlation Benchmark"
 
-### Arxiv paper filtering step 
+### Arxiv paper filtering step ###
 arxiv_metadata_filters:
   # Only allow these arxiv categories
   allowed_categories: ["cs.LG", "stat.ML", "cs.AI"]
@@ -21,9 +21,13 @@ arxiv_metadata_filters:
     - "spurious correlation"
   
 
+# maximum number of papers to scan from the arxiv dataset. -1 = no limit
+MAX_SCAN_LIMIT: -1  
 
-MAX_SCAN_LIMIT: -1   # maximum number of papers to scan from the arxiv dataset. -1 = no limit
-MAX_LLM_CALLS: 2   # maximum number of LLM calls. -1 = no limit
+# maximum number of LLM calls. -1 = no limit
+MAX_LLM_CALLS: 2   
+
+model_name: "gemini-3-flash-preview"
 
 target_dataset:
   name: "Waterbirds"
