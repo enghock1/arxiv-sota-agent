@@ -10,16 +10,17 @@ from .core import SOTAEntry
 # Setup Logger
 logger = logging.getLogger(__name__)
 
-class AgentClient:
-    def __init__(self, project_id: str, location: str = "us-central1"):
+class GeminiAgentClient:
+    def __init__(self, project_id: str, location: str = "us-central1", model_name: str ="gemini-3-flash-preview"):
         self.project_id = project_id
         self.location = location
+        self.model_name = model_name
         
         # Initialize Vertex AI
         vertexai.init(project=self.project_id, location=self.location)
         
         # Use Gemini 2.5 Flash for best instruction following
-        self.model = GenerativeModel("gemini-2.5-flash")
+        self.model = GenerativeModel(self.model_name)
         
     def analyze_paper(self, title: str, abstract: str, config: Dict[str, Any]) -> Optional[SOTAEntry]:
         """

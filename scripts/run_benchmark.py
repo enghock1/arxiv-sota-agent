@@ -1,4 +1,3 @@
-import os
 import sys
 import time
 import json
@@ -6,63 +5,37 @@ import argparse
 import pandas as pd
 from tqdm import tqdm
 from pathlib import Path
-from dotenv import load_dotenv
 
-from sota_agent.vertex_client import AgentClient
-from sota_agent.utils.filter import filter_arxiv_metadata
-from sota_agent.utils.data_ingest import load_config, stream_arxiv_data
+from sota_agent.client import GeminiAgentClient
+from sota_agent.utils import (load_config,
+                              get_google_project_id, 
+                              scan_arxiv_papers)
+from sota_agent.utils.fetcher import fetch_arxiv_paper
 
 # root path setup
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CONSTANTS = {
+PATHS = {
     "DATA": PROJECT_ROOT / "data/raw/arxiv-metadata-oai-snapshot.json",
     "OUTPUT": PROJECT_ROOT / "data/processed",
+    "PDFS": PROJECT_ROOT / "data/pdfs",
 }
 
-def main(config_path: str):
+def main(config_path: Path):
 
     # get google project id from .env
-    load_dotenv()
-    project_id = os.getenv("GOOGLE_PROJECT_ID")
-    print(f"Google project id used: {project_id}")
-    if not project_id:
-        print("Error: GOOGLE_PROJECT_ID not set.")
-        sys.exit(1)
+    project_id = get_google_project_id()
+    print(f"Google project id used: {project_id}.")
 
-    print(f"Loading Config from {config_path}...")
-    try:
-        config = load_config(Path(config_path))
-    except Exception as e:
-        print(f"Config Error: {e}")
-        sys.exit(1)
+    # load config file
+    config = load_config(config_path)
+    print(f"Loaded config from {config_path}.")
 
     # filtering according to the specified keywords
-    print(f"\nScanning for '{config['target_dataset']['name']}' papers...")
-    candidates = []
-    scanned_count = 0
-    
-    try:
-        data_stream = stream_arxiv_data(CONSTANTS['DATA'])
-        pbar = tqdm(data_stream, desc="Scanning", unit="papers")
-        for paper in pbar:
-            
-            if config["MAX_SCAN_LIMIT"] != -1 and scanned_count >= config["MAX_SCAN_LIMIT"]:
-                break
-                
-            if filter_arxiv_metadata(paper, config):
-                candidates.append(paper)
-                pbar.set_postfix({"Found": len(candidates)})
-            
-            scanned_count += 1
-            
-    except FileNotFoundError:
-        print(f"Error: Data file not found at {CONSTANTS['DATA']}")
-        sys.exit(1)
+    print("\nScanning for papers... ", end="")
+    candidates = scan_arxiv_papers(config, PATHS['DATA'])
+    print(f"Scan Complete. Candidates Found: {len(candidates)}.")
 
-    print(f"\nScan Complete. Scanned: {scanned_count:,}. Candidates Found: {len(candidates)}")
-
-    quit()
-
+    # check candidates count
     if not candidates:
         print("No candidates found. Try broadening keywords.")
         sys.exit(0)
@@ -71,16 +44,16 @@ def main(config_path: str):
 
     # Dump a preview of the candidates to a JSON file
     if candidates:
-        print(f"\nDumping first {min(20, len(candidates))} candidates to a preview file...")
-        preview_candidates = candidates[:20]
-        preview_output_path = CONSTANTS['OUTPUT'] / "candidates_preview.json"
-        CONSTANTS['OUTPUT'].mkdir(parents=True, exist_ok=True)
+        print(f"\nDumping first {min(50, len(candidates))} candidates to a preview file...")
+        preview_candidates = candidates[:50]
+        preview_output_path = PATHS['OUTPUT'] / "candidates_preview.json"
+        PATHS['OUTPUT'].mkdir(parents=True, exist_ok=True)
         with open(preview_output_path, 'w', encoding='utf-8') as f:
             json.dump(preview_candidates, f, indent=4, ensure_ascii=False)
         print(f"Preview saved to {preview_output_path}")
 
-    # user confirmation.
-    user_input = input(f"Proceed with LLM extraction? (yes/no) (Double check on MAX_LLM_CALLS = {config['MAX_LLM_CALLS']}): ").lower()
+    # prompt user for confirmation to proceed to LLM extraction
+    user_input = input(f"Proceed with LLM extraction? (yes/no) (MAX_LLM_CALLS = {config['MAX_LLM_CALLS']}): ").lower()
     if user_input not in ['yes', 'y']:
         print("Operation cancelled by user.")
         sys.exit(0)
@@ -90,9 +63,21 @@ def main(config_path: str):
     papers_to_process = candidates[:config['MAX_LLM_CALLS']] if config['MAX_LLM_CALLS'] != -1 else candidates
     print(f"\nRunning Vertex AI on {len(papers_to_process)} candidates...")
     
+    # Download PDFs and extract text
+    print("\nDownloading papers...")
+    for paper in tqdm(papers_to_process, desc="Downloading", unit="papers"):
+        arxiv_id = paper.get('id')
+        if arxiv_id:
+            paper_data = fetch_arxiv_paper(arxiv_id, PATHS['PDFS'], extract_text=True)
+            paper['full_text'] = paper_data.get('text')
+            paper['pdf_path'] = paper_data.get('pdf_path')
+            time.sleep(3)  # Rate limiting - ArXiv recommends 3 seconds between requests
+
+
+
     # Initialize Vertex AI Client
     try:
-        client = AgentClient(project_id=project_id)
+        client = GeminiAgentClient(project_id=project_id, model_name=config.get("model_name", "gemini-2.5-flash"))
     except Exception as e:
         print(f"Vertex AI Init Failed: {e}")
         sys.exit(1)
@@ -122,11 +107,11 @@ def main(config_path: str):
             tqdm.write(f"Failed to process '{paper.get('title', '')[:20]}...': {e}")
 
     # save output
-    CONSTANTS['OUTPUT'].mkdir(parents=True, exist_ok=True)
+    PATHS['OUTPUT'].mkdir(parents=True, exist_ok=True)
     
     if results:
         df = pd.DataFrame(results).sort_values(by="Metric", ascending=False)
-        output_file = CONSTANTS['OUTPUT'] / "leaderboard.csv"
+        output_file = PATHS['OUTPUT'] / "leaderboard.csv"
         df.to_csv(output_file, index=False)
         
         print("leaderboard")
@@ -141,4 +126,4 @@ if __name__ == "__main__":
                         help="Path to the benchmark configuration YAML file.")
     args = parser.parse_args()
 
-    main(args.config_path)
+    main(Path(args.config_path))
