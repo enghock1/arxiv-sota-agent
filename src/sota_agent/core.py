@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field, field_validator
 class SOTAEntry(BaseModel):
     paper_title: str = Field(..., description="Title of the research paper.")
     method_name: str = Field(..., description="Name of the method proposed in the paper.")
+    application_field: str = Field(..., description="Application field of the research (e.g., healthcare, materials science, theory, general).")
+    domain: str = Field(..., description="Domain of the research (e.g., Computer Vision, NLP).")
     pipeline: str = Field(..., description="taxonomy pipeline stage specified in yaml config.")
     strategy: str = Field(..., description="specific algorithmic strategy used in each stage.")
     evidence: str = Field(..., description=" Quote from text supporting the metric.")
