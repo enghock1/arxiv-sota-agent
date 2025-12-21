@@ -23,6 +23,6 @@ dependencies:
   - tabulate
   - python-dotenv
   - tqdm
-  - PyPDF2
+  - pypdf
   - pip:
     - docstring_parser
