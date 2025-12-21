@@ -1,6 +1,14 @@
 # Byte-compiled / optimized / DLL files
 
+# Data directory - ignore contents but keep structure
 data/*
+!data/.gitkeep
+!data/*/
+data/*/*.pdf
+data/*/*.tex
+data/*/*.json
+data/*/*.txt
+data/*/*
 
 __pycache__/
 *.py[codz]

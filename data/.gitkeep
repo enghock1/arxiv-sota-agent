@@ -1,0 +1,2 @@
+# This file ensures the data directory structure is tracked by Git
+# All subdirectories contain .gitkeep files to preserve the folder structure
