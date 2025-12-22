@@ -7,9 +7,10 @@ from tqdm import tqdm
 from pathlib import Path
 
 from sota_agent.client import GeminiAgentClient
+from sota_agent.paper import ArxivPaper
 from sota_agent.utils import (load_config,
                               get_google_project_id, 
-                              scan_arxiv_papers)
+                              scan_arxiv_metadata)
 from sota_agent.utils.fetcher import fetch_arxiv_paper
 
 # root path setup
@@ -17,22 +18,26 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PATHS = {
     "DATA": PROJECT_ROOT / "data/raw/arxiv-metadata-oai-snapshot.json",
     "OUTPUT": PROJECT_ROOT / "data/processed",
-    "PDFS": PROJECT_ROOT / "data/pdfs",
+    "SOURCES": PROJECT_ROOT / "data/sources",
+    "PARSED_PAPERS": PROJECT_ROOT / "data/parsed_papers",
 }
 
-def main(config_path: Path):
+def main(config_yaml: Path):
 
     # get google project id from .env
     project_id = get_google_project_id()
     print(f"Google project id used: {project_id}.")
 
     # load config file
-    config = load_config(config_path)
-    print(f"Loaded config from {config_path}.")
+    config = load_config(config_yaml)
+    print(f"Loaded yaml file from {config_yaml}.")
+
+    ### Step 1: Metadata scanning phase ###
+    # filter paper metadata from arxiv dataset based on a set of keywords defined in config.
 
     # filtering according to the specified keywords
     print("\nScanning for papers... ", end="")
-    candidates = scan_arxiv_papers(config, PATHS['DATA'])
+    candidates = scan_arxiv_metadata(config['ARXIV_METADATA_SCANNING_PARAMETERS'], PATHS['DATA'])
     print(f"Scan Complete. Candidates Found: {len(candidates)}.")
 
     # check candidates count
@@ -43,41 +48,138 @@ def main(config_path: Path):
         print("More than 500 candidates found. Are you sure you want to proceed? Consider refining keywords.")
 
     # Dump a preview of the candidates to a JSON file
-    if candidates:
-        print(f"\nDumping first {min(50, len(candidates))} candidates to a preview file...")
-        preview_candidates = candidates[:50]
-        preview_output_path = PATHS['OUTPUT'] / "candidates_preview.json"
+    if config.get('PREVIEW_PARSED_METADATA', False):
+        n = 10
+        print(f"\nDumping first {min(n, len(candidates))} parsed metadata into a preview file...")
+        preview_output_path = PATHS['OUTPUT'] / "parsed_metadata_preview.json"
         PATHS['OUTPUT'].mkdir(parents=True, exist_ok=True)
         with open(preview_output_path, 'w', encoding='utf-8') as f:
-            json.dump(preview_candidates, f, indent=4, ensure_ascii=False)
-        print(f"Preview saved to {preview_output_path}")
+            json.dump(candidates[:n], f, indent=4, ensure_ascii=False)
+        print(f"Metadata preview saved to {preview_output_path}")
 
-    # prompt user for confirmation to proceed to LLM extraction
-    user_input = input(f"Proceed with LLM extraction? (yes/no) (MAX_LLM_CALLS = {config['MAX_LLM_CALLS']}): ").lower()
+    ##############################
+
+
+    ### Step 2: Arxiv source downloading phase ###
+    # Once the selected papers are identified, download their LaTeX sources via arxiv API.
+
+    # user confirmation to download arxiv papers
+    max_arxiv_calls = config['ARXIV_SOURCE_DOWNLOAD_PARAMETERS'].get('max_arxiv_calls', -1)
+    user_input = input(f"Proceed to paper downloading from Arxiv? (yes/no) (max_arxiv_calls = {max_arxiv_calls}): ").lower()
     if user_input not in ['yes', 'y']:
-        print("Operation cancelled by user.")
+        print("Operation cancelled.")
         sys.exit(0)
-    print("Filtering step complete. Proceeding to LLM extraction...")
 
     # Apply safety limit
-    papers_to_process = candidates[:config['MAX_LLM_CALLS']] if config['MAX_LLM_CALLS'] != -1 else candidates
-    print(f"\nRunning Vertex AI on {len(papers_to_process)} candidates...")
+    papers_to_process = candidates[:max_arxiv_calls] if max_arxiv_calls != -1 else candidates
+    print(f"\nDownloading and parsing {len(papers_to_process)} papers...")
     
-    # Download PDFs and extract text
-    print("\nDownloading papers...")
+    # Download LaTeX sources and extract text
+    print("\nDownloading papers...", end="")
+    keep_source = config['ARXIV_SOURCE_DOWNLOAD_PARAMETERS'].get('keep_latex_source', False)
+    save_parsed = config['ARXIV_SOURCE_DOWNLOAD_PARAMETERS'].get('save_parsed_papers', True)
+    
+    if save_parsed:
+        PATHS['PARSED_PAPERS'].mkdir(parents=True, exist_ok=True)
+    
+    parsed_papers = []
     for paper in tqdm(papers_to_process, desc="Downloading", unit="papers"):
         arxiv_id = paper.get('id')
         if arxiv_id:
-            paper_data = fetch_arxiv_paper(arxiv_id, PATHS['PDFS'], extract_text=True)
-            paper['full_text'] = paper_data.get('text')
-            paper['pdf_path'] = paper_data.get('pdf_path')
-            time.sleep(3)  # Rate limiting - ArXiv recommends 3 seconds between requests
+            # Check if parsed paper already exists
+            parsed_file = PATHS['PARSED_PAPERS'] / f"{arxiv_id}.json"
+            if parsed_file.exists():
+                # Load existing parsed paper
+                with open(parsed_file, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+                paper['full_text'] = existing_data.get('full_text')
+                paper['source_path'] = existing_data.get('source_path')
+                paper['sections'] = existing_data.get('sections', [])
+                if existing_data.get('metadata'):
+                    paper['metadata'] = existing_data['metadata']
+
+                parsed_papers.append(paper)
+                continue
+            
+            # If not, download and parse new paper
+            paper_data = fetch_arxiv_paper(arxiv_id, PATHS['PARSED_PAPERS'], PATHS['SOURCES'], keep_source=keep_source)
+            latex_text = paper_data.get('text')
+            
+            # Parse LaTeX into structured sections
+            if latex_text:
+                arxiv_paper = ArxivPaper(
+                    arxiv_id=arxiv_id,
+                    source_path=paper_data.get('main_tex'),
+                    metadata=paper_data.get('metadata')
+                )
+                arxiv_paper.parse(latex_text)
+                
+                # Update paper dict with parsed data
+                paper['full_text'] = latex_text
+                paper['source_path'] = paper_data.get('main_tex')
+                paper['sections'] = arxiv_paper.sections
+                # Merge fetched metadata with existing paper data
+                if paper_data.get('metadata'):
+                    paper['metadata'] = paper_data['metadata']
+                
+                # Save parsed paper to JSON
+                if save_parsed:
+                    with open(parsed_file, 'w', encoding='utf-8') as f:
+                        json.dump(arxiv_paper.to_dict(), f, indent=2, ensure_ascii=False)
+            
+                parsed_papers.append(paper)
+
+            time.sleep(3)  # Rate limit for new downloads
+    print(" Download and parse complete.")
+    if save_parsed:
+        print(f"Parsed papers saved to {PATHS['PARSED_PAPERS']}")
+    ################################
 
 
+
+    ### Step 3: Parsed paper scanning phase ###
+    # Scan the parsed papers and filter by keywords in full text sections
+    
+    content_keywords = config.get('PARSED_PAPER_SCANNING_PARAMETERS', {}).get('content_keywords', [])
+    
+    if not content_keywords:
+        print("No content keywords specified. Using all downloaded papers.")
+        papers_for_llm = parsed_papers
+    else:
+        print(f"Filtering papers by content keywords: {content_keywords}")
+        papers_for_llm = []
+        
+        for paper in tqdm(parsed_papers, desc="Scanning parsed papers", unit="papers"):
+            sections = paper.get('sections', [])
+            
+            # Search in sections content
+            found = False
+            for section in sections:
+                section_content = section.get('content', '').lower()
+                if any(kw.lower() in section_content for kw in content_keywords):
+                    found = True
+                    break
+            
+            if found:
+                papers_for_llm.append(paper)
+        
+        print(f"Papers after content filtering: {len(papers_for_llm)} / {len(parsed_papers)}")
+        print([paper.get('id') for paper in papers_for_llm])
+    
+    if not papers_for_llm:
+        print("No papers matched the content keywords. Exiting.")
+        sys.exit(0)
+    
+    ################################
+
+    quit()
+
+    # get model name
+    model_name = config.get("MODEL_NAME", "gemini-2.5-flash")
 
     # Initialize Vertex AI Client
     try:
-        client = GeminiAgentClient(project_id=project_id, model_name=config.get("model_name", "gemini-2.5-flash"))
+        client = GeminiAgentClient(project_id=project_id, model_name=model_name)
     except Exception as e:
         print(f"Vertex AI Init Failed: {e}")
         sys.exit(1)
@@ -122,8 +224,8 @@ def main(config_path: Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run SOTA Benchmarking on ArXiv Papers.")
-    parser.add_argument("--config_path", type=str, default="config/benchmark_config.yaml",
+    parser.add_argument("--config_yaml", type=str, default="config/benchmark_config.yaml",
                         help="Path to the benchmark configuration YAML file.")
     args = parser.parse_args()
 
-    main(Path(args.config_path))
+    main(Path(args.config_yaml))
