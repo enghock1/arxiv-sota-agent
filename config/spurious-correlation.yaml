@@ -1,14 +1,18 @@
 benchmark_name: "Spurious Correlation Benchmark"
 
-### Arxiv paper filtering step ###
-arxiv_metadata_filters:
+### step 1: parameters used for scanning and filtering arxiv metadata database ###
+ARXIV_METADATA_SCANNING_PARAMETERS:
+  
+  # maximum number of metadata entries to scan from the arxiv dataset (-1 = no limit)
+  max_metadata_scan_limit: -1  
+
   # Only allow these arxiv categories
   allowed_categories: ["cs.LG", "stat.ML", "cs.AI"]
   
-  # Filter out old papers
+  # Minimum publication date (YYYY-MM-DD)
   min_date: "2015-01-01"
   
-  # Exclude papers that sound like surveys or reviews
+  # Exclude non-technical papers based on title keywords
   exclude_title_keywords: 
     - "survey"
     - "review"
@@ -17,20 +21,35 @@ arxiv_metadata_filters:
   # Is the paper published? (by checking if doi exist)
   is_published: false
 
-  abstract_keywords:
+  # keywords to search for in title/abstract
+  title_abstract_keywords:
     - "spurious correlation"
+
+
+### Step 2: parameters used for downloading arxiv LaTeX sources ###
+ARXIV_SOURCE_DOWNLOAD_PARAMETERS:
   
+  # maximum number of ArXiv download calls. (-1 = no limit)
+  max_arxiv_calls: 500
 
-# maximum number of papers to scan from the arxiv dataset. -1 = no limit
-MAX_SCAN_LIMIT: -1  
+  # whether to store the downloaded LaTeX source files in data/sources/ dir.
+  keep_latex_source: false  
 
-# maximum number of LLM calls. -1 = no limit
-MAX_LLM_CALLS: 2   
+  # whether to save parsed papers after downloading. Will save in data/parsed_papers/ dir.
+  save_parsed_papers: true
 
-model_name: "gemini-3-flash-preview"
+  # whether to preview the first 10 parsed papers after downloading. Will save in data/processed/ dir.
+  preview_parsed_papers: true
 
-target_dataset:
-  name: "Waterbirds"
+
+### Step 3: parameters used for scanning and filtering parsed papers ###
+PARSED_PAPER_SCANNING_PARAMETERS:
+
+  # keywords to search for in parsed paper content (sections)
+  content_keywords:
+    - "Waterbirds"
+
+MODEL_NAME: "gemini-3-flash-preview"
 
 pipeline_stages: 
   - "Data-Centric" # data augmentation, balancing, reweighting
