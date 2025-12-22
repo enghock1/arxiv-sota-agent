@@ -16,6 +16,9 @@ dependencies = [
     "google-cloud-aiplatform",
     "pydantic>=2.0",
     "pandas",
+    "requests",
+    "pyyaml",
+    "tqdm",
 ]
 
 [project.optional-dependencies]
@@ -27,3 +30,13 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+filterwarnings = [
+    "ignore::cryptography.utils.CryptographyDeprecationWarning",
+    "ignore::DeprecationWarning",
+]
