@@ -4,7 +4,8 @@ from typing import Optional, Dict, Any
 from vertexai.generative_models import GenerativeModel, GenerationConfig, HarmCategory, HarmBlockThreshold
 
 # Import the schema to generate the JSON constraint
-from .core import SOTAEntry
+from .generator import SOTAEntry
+from .paper import ArxivPaper
 
 
 # Setup Logger
@@ -22,20 +23,20 @@ class GeminiAgentClient:
         # Use Gemini 2.5 Flash for best instruction following
         self.model = GenerativeModel(self.model_name)
         
-    def analyze_paper(self, title: str, abstract: str, config: Dict[str, Any]) -> Optional[SOTAEntry]:
+    def analyze_paper(self, paper: ArxivPaper, config: Dict[str, Any]) -> Optional[SOTAEntry]:
         """
         Analyzes the paper abstract using parameters defined in the YAML config.
         """
         
         # Extract Dynamic Configs
-        dataset_name = config['target_dataset']['name']
-        metric_name = config['extraction_goals']['primary_metric']
-        metric_desc = config['extraction_goals']['primary_metric_description']
+        dataset_name = ", ".join(config['selected_dataset_names'])
+
+        # consider only one performance metric for now (TODO: extend to multiple metrics)
+        metric_name = list(config['metrics'].keys())[0]
+        metric_desc = config['metrics'][metric_name]
         
-        # Extract Valid Stages (The Strict Constraints)
-        # We join them into a string to show the LLM its options
-        valid_stages = config['pipeline_stages']
-        stages_str = ", ".join([f"'{s}'" for s in valid_stages])
+        # Extract pipeline stages
+        stages_str = ", ".join([f"'{s}'" for s in config['pipeline_stages']])
         
         # Construct the System Prompt
         system_prompt = f"""
@@ -43,7 +44,7 @@ class GeminiAgentClient:
 
         --- TARGETS ---
         DATASET: {dataset_name}
-        METRIC: {metric_name} ({metric_desc})
+        METRIC: {metric_name} (description: {metric_desc})
 
         --- ALLOWED STAGES ---
         You must classify the method into one of these strict Pipeline Stages:
@@ -54,32 +55,32 @@ class GeminiAgentClient:
         2. **metric_value**: Extract the exact numeric value for {metric_name}.
             - If the text says "85.5%", return 0.855.
             - If not reported, set to null.
-        3. **evidence**: You MUST provide a direct, verbatim quote from the abstract that supports the extracted metric.
+        3. **evidence**: You MUST provide a direct, verbatim quote from the parsed paper that supports the extracted metric.
         4. **dataset_mentioned**: specific check if {dataset_name} is explicitly tested.
 
         """
 
 
-        # 4. Enforce JSON Output using the Pydantic Schema
+        # Enforce JSON Output using the Pydantic Schema
         generation_config = GenerationConfig(
             response_mime_type="application/json",
             response_schema=SOTAEntry.model_json_schema(),
             temperature=0.0, # Deterministic output
         )
-        
-        # Safety Settings (Optional: Prevent blocking on harmless academic text)
-        safety_settings = {
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-        }
 
+        # xreate final prompt
+        final_prompt = (
+            f"{system_prompt}\n\n"
+            f"TITLE: {paper.metadata.get('title')}\n\n"
+            f"ABSTRACT: {paper.metadata.get('abstract')}\n\n"
+            f"MAIN TEXT: {paper.get_text_for_llm(max_chars=50000, include_abstract=False)}"
+        )
+
+        # Call LLM
         try:
             response = self.model.generate_content(
-                f"{system_prompt}\n\nTITLE:\n{title}\n\nABSTRACT:\n{abstract}",
-                generation_config=generation_config,
-                safety_settings=safety_settings
+                final_prompt,
+                generation_config=generation_config
             )
             
             # The API returns a JSON string, which Pydantic parses & validates

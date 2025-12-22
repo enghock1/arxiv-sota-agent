@@ -13,8 +13,10 @@ class ArxivPaper:
     # Sections to exclude from LLM processing
     EXCLUDED_SECTIONS = {
         'references', 'bibliography', 'appendix', 'supplementary',
-        'acknowledgments', 'acknowledgements', 'author contributions',
-        'funding', 'ethics statement', 'checklist', 'supplementary material'
+        'related work', 'conclusion', 'impact statement', 'data setup',
+        'model setup', 'setup', 'experimental setup', 'introduction',
+        'acknowledgements', 'author contributions', 'funding', 
+        'ethics statement', 'checklist', 'supplementary material'
     }
     
     def __init__(self, arxiv_id: str, source_path: Optional[Path] = None, metadata: Optional[Dict] = None):
@@ -75,7 +77,6 @@ class ArxivPaper:
         matches = list(re.finditer(section_pattern, latex_text))
         
         for i, match in enumerate(matches):
-            section_level = match.group(1)  # 'sub' or None
             section_title = match.group(2).strip()
             
             # Clean the title

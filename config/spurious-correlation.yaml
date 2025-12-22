@@ -30,7 +30,7 @@ ARXIV_METADATA_SCANNING_PARAMETERS:
 ARXIV_SOURCE_DOWNLOAD_PARAMETERS:
   
   # maximum number of ArXiv download calls. (-1 = no limit)
-  max_arxiv_calls: 500
+  max_arxiv_calls: -1
 
   # whether to store the downloaded LaTeX source files in data/sources/ dir.
   keep_latex_source: false  
@@ -49,14 +49,24 @@ PARSED_PAPER_SCANNING_PARAMETERS:
   content_keywords:
     - "Waterbirds"
 
-MODEL_NAME: "gemini-3-flash-preview"
 
-pipeline_stages: 
-  - "Data-Centric" # data augmentation, balancing, reweighting
-  - "Representation Learning" # invariant learning, contrastive learning, feature disentanglement
-  - "Post-hoc Methods" # finetuning, ensemble learning, calibration
-  - "Others"
+### Step 4: parameters used for LLM extraction phase ###
+LLM_EXTRACTION_PARAMETERS:
 
-extraction_goals:
-  primary_metric: "Worst-Group Accuracy"
-  primary_metric_description: "Lowest accuracy across anny subgroup."
+  # model name to use for extraction
+  model_name: "gemini-3-flash-preview"
+
+  max_llm_calls: 5
+
+  selected_dataset_names:
+    - "Waterbirds"
+
+  pipeline_stages: 
+    - "Data-Centric" # data augmentation, balancing, reweighting
+    - "Representation Learning" # invariant learning, contrastive learning, feature disentanglement
+    - "Post-hoc Methods" # finetuning, ensemble learning, calibration
+    - "Others"
+
+  # performance metric to extract. key = metric name, value = metric description
+  metrics:
+    "Worst-Group Accuracy": "Lowest accuracy across anny subgroup."

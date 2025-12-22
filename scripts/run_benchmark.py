@@ -164,7 +164,6 @@ def main(config_yaml: Path):
                 papers_for_llm.append(paper)
         
         print(f"Papers after content filtering: {len(papers_for_llm)} / {len(parsed_papers)}")
-        print([paper.get('id') for paper in papers_for_llm])
     
     if not papers_for_llm:
         print("No papers matched the content keywords. Exiting.")
@@ -172,10 +171,20 @@ def main(config_yaml: Path):
     
     ################################
 
-    quit()
+
+
+    ### Step 4: LLM extraction phase ###
+    # Extract information using Gemini LLM via Vertex AI
+
+    # user confirmation to download arxiv papers
+    max_llm_calls = config['LLM_EXTRACTION_PARAMETERS'].get('max_llm_calls', -1)
+    user_input = input(f"Proceed to extract paper using LLM? (yes/no) (max_llm_calls = {max_llm_calls}): ").lower()
+    if user_input not in ['yes', 'y']:
+        print("Operation cancelled.")
+        sys.exit(0)
 
     # get model name
-    model_name = config.get("MODEL_NAME", "gemini-2.5-flash")
+    model_name = config['LLM_EXTRACTION_PARAMETERS'].get("model_name", "gemini-2.5-flash")
 
     # Initialize Vertex AI Client
     try:
@@ -184,23 +193,27 @@ def main(config_yaml: Path):
         print(f"Vertex AI Init Failed: {e}")
         sys.exit(1)
 
+    # Apply safety limit
+    papers_to_process = papers_for_llm[:max_llm_calls] if max_llm_calls != -1 else papers_for_llm
+    print(f"\nExtracting from {len(papers_to_process)} papers...")
+
     # LLM extraction loop
     results = []
     for paper in tqdm(papers_to_process, desc="Extracting", unit="papers"):
         try:
             # agent call
-            entry = client.analyze_paper(paper['title'], paper['abstract'], config)
+            entry = client.analyze_paper(paper, config['LLM_EXTRACTION_PARAMETERS'])
             print(f"Extracted Entry: {entry}\n")
             
             if entry and entry.metric_value is not None:
                 results.append({
+                    "Paper Title": entry.paper_title,
                     "Method": entry.method_name,
                     "Pipeline Stage": entry.pipeline,
                     "Strategy": entry.strategy,
                     "Metric": entry.metric_value,
                     "Evidence": entry.evidence,
                     "Dataset Mentioned": entry.dataset_mentioned,
-                    "Paper Title": entry.paper_title
                 })
                 time.sleep(0.1) 
                 
