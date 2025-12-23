@@ -63,12 +63,12 @@ def main(config_yaml: Path):
     ### Step 2: Arxiv source downloading phase ###
     # Once the selected papers are identified, download their LaTeX sources via arxiv API.
 
-    # user confirmation to download arxiv papers
+    # # user confirmation to download arxiv papers
     max_arxiv_calls = config['ARXIV_SOURCE_DOWNLOAD_PARAMETERS'].get('max_arxiv_calls', -1)
-    user_input = input(f"Proceed to paper downloading from Arxiv? (yes/no) (max_arxiv_calls = {max_arxiv_calls}): ").lower()
-    if user_input not in ['yes', 'y']:
-        print("Operation cancelled.")
-        sys.exit(0)
+    # user_input = input(f"Proceed to paper downloading from Arxiv? (yes/no) (max_arxiv_calls = {max_arxiv_calls}): ").lower()
+    # if user_input not in ['yes', 'y']:
+    #     print("Operation cancelled.")
+    #     sys.exit(0)
 
     # Apply safety limit
     papers_to_process = candidates[:max_arxiv_calls] if max_arxiv_calls != -1 else candidates
@@ -163,9 +163,7 @@ def main(config_yaml: Path):
         print("No content keywords specified. Using all downloaded papers.")
         papers_for_llm = parsed_papers
     else:
-        print(f"Filtering papers by content keywords: {content_keywords}")
         papers_for_llm = []
-        
         for arxiv_paper in tqdm(parsed_papers, desc="Scanning parsed papers", unit="papers"):
             # Search in sections content
             found = False
@@ -193,10 +191,10 @@ def main(config_yaml: Path):
 
     # user confirmation to download arxiv papers
     max_llm_calls = config['LLM_EXTRACTION_PARAMETERS'].get('max_llm_calls', -1)
-    user_input = input(f"Proceed to extract paper using LLM? (yes/no) (max_llm_calls = {max_llm_calls}): ").lower()
-    if user_input not in ['yes', 'y']:
-        print("Operation cancelled.")
-        sys.exit(0)
+    # user_input = input(f"Proceed to extract paper using LLM? (yes/no) (max_llm_calls = {max_llm_calls}): ").lower()
+    # if user_input not in ['yes', 'y']:
+    #     print("Operation cancelled.")
+    #     sys.exit(0)
 
     # get model name
     model_name = config['LLM_EXTRACTION_PARAMETERS'].get("model_name", "gemini-2.5-flash")
@@ -212,11 +210,11 @@ def main(config_yaml: Path):
     papers_to_process = papers_for_llm[:max_llm_calls] if max_llm_calls != -1 else papers_for_llm
     print(f"\nExtracting from {len(papers_to_process)} papers...")
 
-    # save paper_to_process to a json file for debugging
-    debug_save_path = PATHS['OUTPUT'] / "papers_to_process_debug.json"
-    with open(debug_save_path, 'w', encoding='utf-8') as f:
-        json.dump([p.to_dict() for p in papers_to_process], f, indent=4, ensure_ascii=False)
-    print(f"Saved papers to process to {debug_save_path} for debugging.")
+    # # save paper_to_process to a json file for debugging
+    # debug_save_path = PATHS['OUTPUT'] / "papers_to_process_debug.json"
+    # with open(debug_save_path, 'w', encoding='utf-8') as f:
+    #     json.dump([p.to_dict() for p in papers_to_process], f, indent=4, ensure_ascii=False)
+    # print(f"Saved papers to process to {debug_save_path} for debugging.")
 
     # LLM extraction loop
     results = []

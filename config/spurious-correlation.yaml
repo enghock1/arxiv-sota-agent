@@ -54,7 +54,7 @@ PARSED_PAPER_SCANNING_PARAMETERS:
 LLM_EXTRACTION_PARAMETERS:
 
   # model name to use for extraction
-  model_name: "gemini-3-flash-preview"
+  model_name: "gemini-2.5-flash"
 
   max_llm_calls: 10
 
