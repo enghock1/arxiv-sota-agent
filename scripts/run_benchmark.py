@@ -82,10 +82,22 @@ def main(config_yaml: Path):
     if save_parsed:
         PATHS['PARSED_PAPERS'].mkdir(parents=True, exist_ok=True)
     
+    # Load failed downloads list to skip them
+    failed_downloads_file = PATHS['PARSED_PAPERS'] / "failed_downloads.json"
+    failed_downloads = set()
+    if failed_downloads_file.exists():
+        with open(failed_downloads_file, 'r', encoding='utf-8') as f:
+            failed_downloads = set(json.load(f))
+    
     parsed_papers = []
     for paper_metadata in tqdm(papers_to_process, desc="Downloading", unit="papers"):
         arxiv_id = paper_metadata.get('id')
         if arxiv_id:
+            # Skip if previously failed
+            if arxiv_id in failed_downloads:
+                tqdm.write(f"Skipping {arxiv_id} (previously failed)")
+                continue
+            
             # Check if parsed paper already exists
             parsed_file = PATHS['PARSED_PAPERS'] / f"{arxiv_id}.json"
             if parsed_file.exists():
@@ -98,30 +110,43 @@ def main(config_yaml: Path):
                 continue
             
             # If not, download and parse new paper
-            paper_data = fetch_arxiv_paper(arxiv_id, PATHS['PARSED_PAPERS'], PATHS['SOURCES'], keep_source=keep_source)
-            latex_text = paper_data.get('text')
-            
-            # Parse LaTeX into structured sections
-            if latex_text:
-                # Merge metadata from scanning with fetched metadata
-                merged_metadata = paper_metadata.copy()
-                if paper_data.get('metadata'):
-                    merged_metadata.update(paper_data['metadata'])
+            try:
+                paper_data = fetch_arxiv_paper(arxiv_id, PATHS['PARSED_PAPERS'], PATHS['SOURCES'], keep_source=keep_source)
+                latex_text = paper_data.get('text')
                 
-                arxiv_paper = ArxivPaper(
-                    arxiv_id=arxiv_id,
-                    source_path=paper_data.get('main_tex'),
-                    metadata=merged_metadata
-                )
-                arxiv_paper.parse(latex_text)
+                # Parse LaTeX into structured sections
+                if latex_text:
+                    # Merge metadata from scanning with fetched metadata
+                    merged_metadata = paper_metadata.copy()
+                    if paper_data.get('metadata'):
+                        merged_metadata.update(paper_data['metadata'])
+                    
+                    arxiv_paper = ArxivPaper(
+                        arxiv_id=arxiv_id,
+                        source_path=paper_data.get('main_tex'),
+                        metadata=merged_metadata
+                    )
+                    arxiv_paper.parse(latex_text)
+                    
+                    # Save parsed paper to JSON
+                    if save_parsed:
+                        arxiv_paper.save_to_json(parsed_file)
                 
-                # Save parsed paper to JSON
-                if save_parsed:
-                    arxiv_paper.save_to_json(parsed_file)
-            
-                parsed_papers.append(arxiv_paper)
+                    parsed_papers.append(arxiv_paper)
+                else:
+                    # Mark as failed if no text was extracted
+                    tqdm.write(f"Failed to extract text from {arxiv_id}")
+                    failed_downloads.add(arxiv_id)
+                    
+            except Exception as e:
+                tqdm.write(f"Failed to download {arxiv_id}: {e}")
+                failed_downloads.add(arxiv_id)
 
             time.sleep(3)  # Rate limit for new downloads
+    
+    # Save updated failed downloads list
+    with open(failed_downloads_file, 'w', encoding='utf-8') as f:
+        json.dump(sorted(list(failed_downloads)), f, indent=2)
     print(" Download and parse complete.")
     if save_parsed:
         print(f"Parsed papers saved to {PATHS['PARSED_PAPERS']}")
