@@ -1,7 +1,8 @@
+import os
 import logging
-import vertexai
+from google import genai
+from google.genai import types
 from typing import Optional, Dict, Any
-from vertexai.generative_models import GenerativeModel, GenerationConfig
 
 # Import the schema to generate the JSON constraint
 from .schema import SOTAEntry
@@ -12,16 +13,17 @@ from .paper import ArxivPaper
 logger = logging.getLogger(__name__)
 
 class GeminiAgentClient:
-    def __init__(self, project_id: str, location: str = "us-central1", model_name: str ="gemini-3-flash-preview"):
+    def __init__(self, project_id: str, location: str = "global", model_name: str ="gemini-2.5-flash"):
         self.project_id = project_id
         self.location = location
         self.model_name = model_name
         
-        # Initialize Vertex AI
-        vertexai.init(project=self.project_id, location=self.location)
-        
-        # Use Gemini 2.5 Flash for best instruction following
-        self.model = GenerativeModel(self.model_name)
+        # Initialize Gemini client with Vertex AI
+        self.client = genai.Client(
+            vertexai=True,
+            project=self.project_id,
+            location=self.location
+        )
         
     def analyze_paper(self, paper: ArxivPaper, config: Dict[str, Any]) -> Optional[SOTAEntry]:
         """
@@ -55,37 +57,52 @@ class GeminiAgentClient:
         2. **metric_value**: Extract the exact numeric value for {metric_name}.
             - If the text says "85.5%", return 0.855.
             - If not reported, set to null.
+            - Sometimes it may not use the exact metric name, infer based on context, and explicitly mention this in evidence.
         3. **evidence**: You MUST provide a direct, verbatim quote from the parsed paper that supports the extracted metric.
         4. **dataset_mentioned**: specific check if {dataset_name} is explicitly tested.
 
         """
 
-
-        # Enforce JSON Output using the Pydantic Schema
-        generation_config = GenerationConfig(
-            response_mime_type="application/json",
-            response_schema=SOTAEntry.model_json_schema(),
-            temperature=0.0, # Deterministic output
-        )
-
-        # xreate final prompt
+        # Create final prompt
+        main_text = paper.get_text_for_llm(max_chars=50000, include_abstract=False)
         final_prompt = (
             f"{system_prompt}\n\n"
             f"TITLE: {paper.metadata.get('title')}\n\n"
             f"ABSTRACT: {paper.metadata.get('abstract')}\n\n"
-            f"MAIN TEXT: {paper.get_text_for_llm(max_chars=50000, include_abstract=False)}"
+            f"MAIN TEXT: {main_text}"
+        )
+        
+        # save final_prompt to a text file for debugging
+        os.makedirs("data/debug_prompts", exist_ok=True)
+        debug_prompt_path = f"data/debug_prompts/{paper.arxiv_id}_prompt.txt"
+        with open(debug_prompt_path, "w", encoding="utf-8") as f:
+            f.write(final_prompt)
+
+        # Log prompt size for debugging
+        logger.info(f"Prompt length: {len(final_prompt)} characters")
+
+        # Enforce JSON Output using the Pydantic Schema
+        generation_config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=SOTAEntry.model_json_schema(),
+            temperature=0.0,  # Deterministic output
         )
 
-        # Call LLM
+        # Call LLM with retry logic
         try:
-            response = self.model.generate_content(
-                final_prompt,
-                generation_config=generation_config
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=final_prompt,
+                config=generation_config
             )
             
             # The API returns a JSON string, which Pydantic parses & validates
+            if response.text is None:
+                logger.error("LLM returned no text content")
+                return None
             return SOTAEntry.model_validate_json(response.text)
             
         except Exception as e:
             logger.error(f"LLM Extraction Failed: {e}")
+            logger.error(f"Paper ID: {paper.arxiv_id}, Title: {paper.metadata.get('title', 'Unknown')[:50]}")
             return None
