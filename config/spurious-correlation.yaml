@@ -56,7 +56,7 @@ LLM_EXTRACTION_PARAMETERS:
   # model name to use for extraction
   model_name: "gemini-3-flash-preview"
 
-  max_llm_calls: 5
+  max_llm_calls: 10
 
   selected_dataset_names:
     - "Waterbirds"

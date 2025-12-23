@@ -83,22 +83,18 @@ def main(config_yaml: Path):
         PATHS['PARSED_PAPERS'].mkdir(parents=True, exist_ok=True)
     
     parsed_papers = []
-    for paper in tqdm(papers_to_process, desc="Downloading", unit="papers"):
-        arxiv_id = paper.get('id')
+    for paper_metadata in tqdm(papers_to_process, desc="Downloading", unit="papers"):
+        arxiv_id = paper_metadata.get('id')
         if arxiv_id:
             # Check if parsed paper already exists
             parsed_file = PATHS['PARSED_PAPERS'] / f"{arxiv_id}.json"
             if parsed_file.exists():
-                # Load existing parsed paper
-                with open(parsed_file, 'r', encoding='utf-8') as f:
-                    existing_data = json.load(f)
-                paper['full_text'] = existing_data.get('full_text')
-                paper['source_path'] = existing_data.get('source_path')
-                paper['sections'] = existing_data.get('sections', [])
-                if existing_data.get('metadata'):
-                    paper['metadata'] = existing_data['metadata']
-
-                parsed_papers.append(paper)
+                # Load existing parsed paper as ArxivPaper object
+                arxiv_paper = ArxivPaper.from_json(parsed_file)
+                # Merge with original metadata from scanning if needed
+                if not arxiv_paper.metadata.get('title') and paper_metadata.get('title'):
+                    arxiv_paper.metadata['title'] = paper_metadata['title']
+                parsed_papers.append(arxiv_paper)
                 continue
             
             # If not, download and parse new paper
@@ -107,27 +103,23 @@ def main(config_yaml: Path):
             
             # Parse LaTeX into structured sections
             if latex_text:
+                # Merge metadata from scanning with fetched metadata
+                merged_metadata = paper_metadata.copy()
+                if paper_data.get('metadata'):
+                    merged_metadata.update(paper_data['metadata'])
+                
                 arxiv_paper = ArxivPaper(
                     arxiv_id=arxiv_id,
                     source_path=paper_data.get('main_tex'),
-                    metadata=paper_data.get('metadata')
+                    metadata=merged_metadata
                 )
                 arxiv_paper.parse(latex_text)
                 
-                # Update paper dict with parsed data
-                paper['full_text'] = latex_text
-                paper['source_path'] = paper_data.get('main_tex')
-                paper['sections'] = arxiv_paper.sections
-                # Merge fetched metadata with existing paper data
-                if paper_data.get('metadata'):
-                    paper['metadata'] = paper_data['metadata']
-                
                 # Save parsed paper to JSON
                 if save_parsed:
-                    with open(parsed_file, 'w', encoding='utf-8') as f:
-                        json.dump(arxiv_paper.to_dict(), f, indent=2, ensure_ascii=False)
+                    arxiv_paper.save_to_json(parsed_file)
             
-                parsed_papers.append(paper)
+                parsed_papers.append(arxiv_paper)
 
             time.sleep(3)  # Rate limit for new downloads
     print(" Download and parse complete.")
@@ -149,19 +141,17 @@ def main(config_yaml: Path):
         print(f"Filtering papers by content keywords: {content_keywords}")
         papers_for_llm = []
         
-        for paper in tqdm(parsed_papers, desc="Scanning parsed papers", unit="papers"):
-            sections = paper.get('sections', [])
-            
+        for arxiv_paper in tqdm(parsed_papers, desc="Scanning parsed papers", unit="papers"):
             # Search in sections content
             found = False
-            for section in sections:
+            for section in arxiv_paper.sections:
                 section_content = section.get('content', '').lower()
                 if any(kw.lower() in section_content for kw in content_keywords):
                     found = True
                     break
             
             if found:
-                papers_for_llm.append(paper)
+                papers_for_llm.append(arxiv_paper)
         
         print(f"Papers after content filtering: {len(papers_for_llm)} / {len(parsed_papers)}")
     
@@ -197,12 +187,18 @@ def main(config_yaml: Path):
     papers_to_process = papers_for_llm[:max_llm_calls] if max_llm_calls != -1 else papers_for_llm
     print(f"\nExtracting from {len(papers_to_process)} papers...")
 
+    # save paper_to_process to a json file for debugging
+    debug_save_path = PATHS['OUTPUT'] / "papers_to_process_debug.json"
+    with open(debug_save_path, 'w', encoding='utf-8') as f:
+        json.dump([p.to_dict() for p in papers_to_process], f, indent=4, ensure_ascii=False)
+    print(f"Saved papers to process to {debug_save_path} for debugging.")
+
     # LLM extraction loop
     results = []
-    for paper in tqdm(papers_to_process, desc="Extracting", unit="papers"):
+    for arxiv_paper in tqdm(papers_to_process, desc="Extracting", unit="papers"):
         try:
             # agent call
-            entry = client.analyze_paper(paper, config['LLM_EXTRACTION_PARAMETERS'])
+            entry = client.analyze_paper(arxiv_paper, config['LLM_EXTRACTION_PARAMETERS'])
             print(f"Extracted Entry: {entry}\n")
             
             if entry and entry.metric_value is not None:
@@ -220,7 +216,8 @@ def main(config_yaml: Path):
                 
         except Exception as e:
             # catch exceptions
-            tqdm.write(f"Failed to process '{paper.get('title', '')[:20]}...': {e}")
+            title = arxiv_paper.metadata.get('title', 'Unknown')
+            tqdm.write(f"Failed to process '{title[:20]}...': {e}")
 
     # save output
     PATHS['OUTPUT'].mkdir(parents=True, exist_ok=True)
@@ -231,7 +228,7 @@ def main(config_yaml: Path):
         df.to_csv(output_file, index=False)
         
         print("leaderboard")
-        print(df[["Method", "Pipeline Stage", "Strategy", "Dataset Mentioned", "Evidence", "Metric"]].head(20).to_markdown(index=False))
+        print(df[["Paper Title", "Application", "Domain", "Pipeline Stage", "Strategy", "Metric", "Evidence", "Dataset Mentioned"]].to_markdown(index=False))
         print(f"\nSaved to {output_file}")
     else:
         print("\nNo valid metrics extracted from candidates.")

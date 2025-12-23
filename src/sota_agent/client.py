@@ -1,7 +1,7 @@
 import logging
 import vertexai
 from typing import Optional, Dict, Any
-from vertexai.generative_models import GenerativeModel, GenerationConfig, HarmCategory, HarmBlockThreshold
+from vertexai.generative_models import GenerativeModel, GenerationConfig
 
 # Import the schema to generate the JSON constraint
 from .schema import SOTAEntry
