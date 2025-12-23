@@ -208,7 +208,8 @@ def main(config_yaml: Path):
             if entry and entry.metric_value is not None:
                 results.append({
                     "Paper Title": entry.paper_title,
-                    "Method": entry.method_name,
+                    "Application": entry.application_field,
+                    "Domain": entry.domain,
                     "Pipeline Stage": entry.pipeline,
                     "Strategy": entry.strategy,
                     "Metric": entry.metric_value,

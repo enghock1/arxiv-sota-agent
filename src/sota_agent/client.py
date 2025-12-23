@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any
 from vertexai.generative_models import GenerativeModel, GenerationConfig, HarmCategory, HarmBlockThreshold
 
 # Import the schema to generate the JSON constraint
-from .generator import SOTAEntry
+from .schema import SOTAEntry
 from .paper import ArxivPaper
 
 
