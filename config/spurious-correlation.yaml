@@ -27,13 +27,13 @@ ARXIV_METADATA_SCANNING_PARAMETERS:
 
 
 ### Step 2: parameters used for downloading arxiv LaTeX sources ###
-ARXIV_SOURCE_DOWNLOAD_PARAMETERS:
-  
-  # maximum number of ArXiv download calls. (-1 = no limit)
-  max_arxiv_calls: -1
+ARXIV_DOWNLOAD_PARAMETERS:
 
-  # whether to store the downloaded LaTeX source files in data/sources/ dir.
-  keep_latex_source: false  
+  # maximum number of ArXiv download calls. (-1 = no limit)
+  max_download_calls: 50
+
+  # whether to store the downloaded PDF files in data/sources/ dir.
+  save_files: true
 
   # whether to save parsed papers after downloading. Will save in data/parsed_papers/ dir.
   save_parsed_papers: true
@@ -42,10 +42,13 @@ ARXIV_SOURCE_DOWNLOAD_PARAMETERS:
   preview_parsed_papers: true
 
 
+
 ### Step 3: parameters used for scanning and filtering parsed papers ###
+# For "latex" mode: scans parsed LaTeX sections for keywords
+# For "pdf" mode: scans first 10 pages of PDF for keywords
 PARSED_PAPER_SCANNING_PARAMETERS:
 
-  # keywords to search for in parsed paper content (sections)
+  # keywords to search for in parsed paper content (sections for LaTeX, first 10 pages for PDF)
   content_keywords:
     - "Waterbirds"
 

@@ -7,11 +7,10 @@ from tqdm import tqdm
 from pathlib import Path
 
 from sota_agent.client import GeminiAgentClient
-from sota_agent.paper import ArxivPaper
 from sota_agent.utils import (load_config,
                               get_google_project_id, 
                               scan_arxiv_metadata)
-from sota_agent.utils.fetcher import fetch_arxiv_paper
+from sota_agent.arxiv_download import arxiv_download
 
 # root path setup
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -60,126 +59,32 @@ def main(config_yaml: Path):
     ##############################
 
 
-    ### Step 2: Arxiv source downloading phase ###
-    # Once the selected papers are identified, download their LaTeX sources via arxiv API.
+    ### Step 2: Downloading phase ###
+    parsed_papers = arxiv_download(config['ARXIV_DOWNLOAD_PARAMETERS'], candidates, PATHS)
+    #################################
 
-    # # user confirmation to download arxiv papers
-    max_arxiv_calls = config['ARXIV_SOURCE_DOWNLOAD_PARAMETERS'].get('max_arxiv_calls', -1)
-    # user_input = input(f"Proceed to paper downloading from Arxiv? (yes/no) (max_arxiv_calls = {max_arxiv_calls}): ").lower()
-    # if user_input not in ['yes', 'y']:
-    #     print("Operation cancelled.")
-    #     sys.exit(0)
+    quit()
 
-    # Apply safety limit
-    papers_to_process = candidates[:max_arxiv_calls] if max_arxiv_calls != -1 else candidates
-    print(f"\nDownloading and parsing {len(papers_to_process)} papers...")
-    
-    # Download LaTeX sources and extract text
-    print("\nDownloading papers...", end="")
-    keep_source = config['ARXIV_SOURCE_DOWNLOAD_PARAMETERS'].get('keep_latex_source', False)
-    save_parsed = config['ARXIV_SOURCE_DOWNLOAD_PARAMETERS'].get('save_parsed_papers', True)
-    
-    if save_parsed:
-        PATHS['PARSED_PAPERS'].mkdir(parents=True, exist_ok=True)
-    
-    # Load failed downloads list to skip them
-    failed_downloads_file = PATHS['PARSED_PAPERS'] / "failed_downloads.json"
-    failed_downloads = set()
-    if failed_downloads_file.exists():
-        with open(failed_downloads_file, 'r', encoding='utf-8') as f:
-            failed_downloads = set(json.load(f))
-    
-    parsed_papers = []
-    for paper_metadata in tqdm(papers_to_process, desc="Downloading", unit="papers"):
-        arxiv_id = paper_metadata.get('id')
-        if arxiv_id:
-            # Skip if previously failed
-            if arxiv_id in failed_downloads:
-                tqdm.write(f"Skipping {arxiv_id} (previously failed)")
-                continue
-            
-            # Check if parsed paper already exists
-            parsed_file = PATHS['PARSED_PAPERS'] / f"{arxiv_id}.json"
-            if parsed_file.exists():
-                # Load existing parsed paper as ArxivPaper object
-                arxiv_paper = ArxivPaper.from_json(parsed_file)
-                # Merge with original metadata from scanning if needed
-                if not arxiv_paper.metadata.get('title') and paper_metadata.get('title'):
-                    arxiv_paper.metadata['title'] = paper_metadata['title']
-                parsed_papers.append(arxiv_paper)
-                continue
-            
-            # If not, download and parse new paper
-            try:
-                paper_data = fetch_arxiv_paper(arxiv_id, PATHS['PARSED_PAPERS'], PATHS['SOURCES'], keep_source=keep_source)
-                latex_text = paper_data.get('text')
-                
-                # Parse LaTeX into structured sections
-                if latex_text:
-                    # Merge metadata from scanning with fetched metadata
-                    merged_metadata = paper_metadata.copy()
-                    if paper_data.get('metadata'):
-                        merged_metadata.update(paper_data['metadata'])
-                    
-                    arxiv_paper = ArxivPaper(
-                        arxiv_id=arxiv_id,
-                        source_path=paper_data.get('main_tex'),
-                        metadata=merged_metadata
-                    )
-                    arxiv_paper.parse(latex_text)
-                    
-                    # Save parsed paper to JSON
-                    if save_parsed:
-                        arxiv_paper.save_to_json(parsed_file)
-                
-                    parsed_papers.append(arxiv_paper)
-                else:
-                    # Mark as failed if no text was extracted
-                    tqdm.write(f"Failed to extract text from {arxiv_id}")
-                    failed_downloads.add(arxiv_id)
-                    
-            except Exception as e:
-                tqdm.write(f"Failed to download {arxiv_id}: {e}")
-                failed_downloads.add(arxiv_id)
-
-            time.sleep(3)  # Rate limit for new downloads
-    
-    # Save updated failed downloads list
-    with open(failed_downloads_file, 'w', encoding='utf-8') as f:
-        json.dump(sorted(list(failed_downloads)), f, indent=2)
-    print(" Download and parse complete.")
-    if save_parsed:
-        print(f"Parsed papers saved to {PATHS['PARSED_PAPERS']}")
-    ################################
-
-
-
-    ### Step 3: Parsed paper scanning phase ###
-    # Scan the parsed papers and filter by keywords in full text sections
-    
+    ### Step 3: PDF content filtering phase ###
     content_keywords = config.get('PARSED_PAPER_SCANNING_PARAMETERS', {}).get('content_keywords', [])
     
     if not content_keywords:
-        print("No content keywords specified. Using all downloaded papers.")
+        print("\nNo content keywords specified. Using all downloaded PDFs.")
         papers_for_llm = parsed_papers
     else:
+        print(f"\nFiltering PDFs by keywords: {content_keywords}")
         papers_for_llm = []
-        for arxiv_paper in tqdm(parsed_papers, desc="Scanning parsed papers", unit="papers"):
-            # Search in sections content
-            found = False
-            for section in arxiv_paper.sections:
-                section_content = section.get('content', '').lower()
-                if any(kw.lower() in section_content for kw in content_keywords):
-                    found = True
-                    break
+        for pdf_paper in tqdm(parsed_papers, desc="Scanning PDF content", unit="papers"):
+            # Search in extracted text
+            pdf_text = pdf_paper.extract_text_for_filtering().lower()
             
-            if found:
-                papers_for_llm.append(arxiv_paper)
+            if any(kw.lower() in pdf_text for kw in content_keywords):
+                papers_for_llm.append(pdf_paper)
         
-        print(f"Papers after content filtering: {len(papers_for_llm)} / {len(parsed_papers)}")
+        print(f"PDFs after content filtering: {len(papers_for_llm)} / {len(parsed_papers)}")
     
     if not papers_for_llm:
-        print("No papers matched the content keywords. Exiting.")
+        print("No PDFs matched the content keywords. Exiting.")
         sys.exit(0)
     
     ################################
@@ -188,14 +93,10 @@ def main(config_yaml: Path):
 
     ### Step 4: LLM extraction phase ###
     # Extract information using Gemini LLM via Vertex AI
+    # PDFs are uploaded to Gemini File API and analyzed with multimodal capabilities
 
-    # user confirmation to download arxiv papers
     max_llm_calls = config['LLM_EXTRACTION_PARAMETERS'].get('max_llm_calls', -1)
-    # user_input = input(f"Proceed to extract paper using LLM? (yes/no) (max_llm_calls = {max_llm_calls}): ").lower()
-    # if user_input not in ['yes', 'y']:
-    #     print("Operation cancelled.")
-    #     sys.exit(0)
-
+    
     # get model name
     model_name = config['LLM_EXTRACTION_PARAMETERS'].get("model_name", "gemini-2.5-flash")
 
@@ -208,20 +109,14 @@ def main(config_yaml: Path):
 
     # Apply safety limit
     papers_to_process = papers_for_llm[:max_llm_calls] if max_llm_calls != -1 else papers_for_llm
-    print(f"\nExtracting from {len(papers_to_process)} papers...")
-
-    # # save paper_to_process to a json file for debugging
-    # debug_save_path = PATHS['OUTPUT'] / "papers_to_process_debug.json"
-    # with open(debug_save_path, 'w', encoding='utf-8') as f:
-    #     json.dump([p.to_dict() for p in papers_to_process], f, indent=4, ensure_ascii=False)
-    # print(f"Saved papers to process to {debug_save_path} for debugging.")
+    print(f"\nExtracting from {len(papers_to_process)} papers using {model_name}...")
 
     # LLM extraction loop
     results = []
-    for arxiv_paper in tqdm(papers_to_process, desc="Extracting", unit="papers"):
+    for pdf_paper in tqdm(papers_to_process, desc="Extracting", unit="papers"):
         try:
-            # agent call
-            entry = client.analyze_paper(arxiv_paper, config['LLM_EXTRACTION_PARAMETERS'])
+            # PDF mode: upload PDF to Gemini and analyze
+            entry = client.analyze_paper_from_pdf(pdf_paper, config['LLM_EXTRACTION_PARAMETERS'])
             print(f"Extracted Entry: {entry}\n")
             
             if entry and entry.metric_value is not None:
@@ -239,7 +134,7 @@ def main(config_yaml: Path):
                 
         except Exception as e:
             # catch exceptions
-            title = arxiv_paper.metadata.get('title', 'Unknown')
+            title = pdf_paper.metadata.get('title', 'Unknown')
             tqdm.write(f"Failed to process '{title[:20]}...': {e}")
 
     # save output
