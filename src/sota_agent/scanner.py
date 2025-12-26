@@ -5,15 +5,22 @@ from typing import Dict, Any
 from sota_agent.utils.data_ingester import stream_arxiv_data
 
 
-def scan_arxiv_metadata(config, data_path) -> list:
+def scan_arxiv_metadata(config: Dict[str, Any], paths: Dict[str, Any]) -> list:
     """
     Scans the ArXiv dataset for papers matching the filtering criteria.
+    Params:
+        config: ARXIV_METADATA_SCANNING_PARAMETERS from YAML config.
+        paths: Dictionary of predetermined file paths.
+    Returns:
+        List of candidate paper metadata dicts.
     """
+    
     candidates = []
     scanned_count = 0
 
+    print("\nScanning for papers... ", end="")
     try:
-        data_stream = stream_arxiv_data(data_path)
+        data_stream = stream_arxiv_data(paths['DATA'])
         pbar = tqdm(data_stream, desc="Scanning", unit="papers")
         for paper in pbar:
             
@@ -27,8 +34,17 @@ def scan_arxiv_metadata(config, data_path) -> list:
             scanned_count += 1
             
     except FileNotFoundError:
-        print(f"Error: Data file not found at {data_path}")
+        print(f"Error: Data file not found at {paths['DATA']}")
         sys.exit(1)
+    print(f"Scan Complete. Candidates Found: {len(candidates)}.")
+
+    # check candidates count
+    if not candidates:
+        print("No candidates found. Try broadening keywords.")
+        sys.exit(0)
+    if len(candidates) > 500:
+        print("More than 500 candidates found. Are you sure you want to proceed? Consider refining keywords.")
+
 
     return candidates
 
