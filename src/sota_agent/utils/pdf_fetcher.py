@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from sota_agent.pdf_paper import ArxivPdfPaper
 
 
-def download_arxiv_pdf(arxiv_id: str, output_dir: Path, timeout: int = 30) -> Optional[Path]:
+def download_pdf_from_arxiv(arxiv_id: str, output_dir: Path, timeout: int = 30) -> Optional[Path]:
     """
     Downloads PDF from ArXiv.
     
@@ -49,7 +49,7 @@ def download_arxiv_pdf(arxiv_id: str, output_dir: Path, timeout: int = 30) -> Op
         return None
 
 
-def extract_text_from_pdf_for_filtering(pdf_path: Path, max_pages: int = 10) -> str:
+def extract_text_from_pdf(pdf_path: Path, max_pages: int = 10) -> str:
     """
     Quickly extract text from PDF for keyword filtering.
     Only extracts first N pages for efficiency.
@@ -77,7 +77,7 @@ def extract_text_from_pdf_for_filtering(pdf_path: Path, max_pages: int = 10) -> 
                     text = page.extract_text()
                     if text:
                         text_parts.append(text)
-                except Exception as e:
+                except Exception:
                     # Skip problematic pages
                     continue
         
@@ -88,7 +88,7 @@ def extract_text_from_pdf_for_filtering(pdf_path: Path, max_pages: int = 10) -> 
         return ""
 
 
-def fetch_arxiv_pdf_paper(
+def fetch_paper_from_arxiv(
     arxiv_id: str, 
     paper_metadata: Dict[str, Any],
     pdf_dir: Path, 
@@ -110,15 +110,15 @@ def fetch_arxiv_pdf_paper(
     # Determine download directory
     if keep_pdf:
         download_dir = pdf_dir
-        cleanup_path = None
+        # cleanup_path = None
     else:
         # Use temporary directory
         download_dir = Path(tempfile.mkdtemp())
-        cleanup_path = download_dir
+        # cleanup_path = download_dir
     
     try:
         # Download PDF
-        pdf_path = download_arxiv_pdf(arxiv_id, download_dir)
+        pdf_path = download_pdf_from_arxiv(arxiv_id, download_dir)
         if not pdf_path:
             return None
         
@@ -129,8 +129,8 @@ def fetch_arxiv_pdf_paper(
             metadata=paper_metadata
         )
         
-        # Extract text for filtering (even if not keeping PDF)
-        pdf_paper.raw_text = extract_text_from_pdf_for_filtering(pdf_path, max_pages=10)
+        # Extract text for filtering
+        pdf_paper.raw_text = extract_text_from_pdf(pdf_path, max_pages=10)
         
         # If not keeping PDF, store temporary path for later Gemini upload
         if not keep_pdf:
