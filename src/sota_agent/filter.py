@@ -3,7 +3,7 @@ import json
 from tqdm import tqdm
 from typing import List
 
-from sota_agent.pdf_paper import ArxivPdfPaper
+from sota_agent.model.pdf_paper import ArxivPdfPaper
 
 
 def filter_papers(config: dict, parsed_papers: List[ArxivPdfPaper], paths: dict) -> List[ArxivPdfPaper]:

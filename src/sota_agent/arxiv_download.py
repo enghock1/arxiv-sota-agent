@@ -3,7 +3,7 @@ import time
 from tqdm import tqdm
 from typing import List, Dict, Any
 
-from sota_agent.pdf_paper import ArxivPdfPaper
+from sota_agent.model.pdf_paper import ArxivPdfPaper
 from sota_agent.utils.pdf_fetcher import fetch_paper_from_arxiv
 
 
