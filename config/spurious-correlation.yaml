@@ -38,9 +38,6 @@ ARXIV_DOWNLOAD_PARAMETERS:
   # whether to save parsed papers after downloading. Will save in data/parsed_papers/ dir.
   save_parsed_papers: true
 
-  # whether to preview the first 10 parsed papers after downloading. Will save in data/processed/ dir.
-  preview_parsed_papers: true
-
 
 
 ### Step 3: parameters used for scanning and filtering parsed papers ###
@@ -51,6 +48,11 @@ PARSED_PAPER_SCANNING_PARAMETERS:
   # keywords to search for in parsed paper content (sections for LaTeX, first 10 pages for PDF)
   content_keywords:
     - "Waterbirds"
+
+  # whether to preview parsed papers after downloading. Will save in data/processed/ dir.
+  preview_filtered_papers: true
+
+  
 
 
 ### Step 4: parameters used for LLM extraction phase ###

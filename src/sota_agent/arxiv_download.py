@@ -4,10 +4,10 @@ from tqdm import tqdm
 from typing import List, Dict, Any
 
 from sota_agent.pdf_paper import ArxivPdfPaper
-from sota_agent.utils.pdf_fetcher import fetch_arxiv_pdf_paper
+from sota_agent.utils.pdf_fetcher import fetch_paper_from_arxiv
 
 
-def arxiv_download(config: Dict[str, Any], candidates: List[Dict[str, Any]], paths: Dict[str, Any]):
+def download_arxiv_papers(config: Dict[str, Any], candidates: List[Dict[str, Any]], paths: Dict[str, Any]):
     """
     Function to download ArXiv papers as PDFs and save as ArxivPdfPaper objects.
     Params:
@@ -27,9 +27,10 @@ def arxiv_download(config: Dict[str, Any], candidates: List[Dict[str, Any]], pat
     papers_to_process = candidates[:max_pdf_calls] if max_pdf_calls != -1 else candidates
     print(f"\\nDownloading {len(papers_to_process)} PDFs...")
         
+    # get params
     keep_pdf = config.get('save_files', False)
     save_parsed = config.get('save_parsed_papers', True)
-        
+    
     # Make sure directories exist
     if save_parsed:
         parsed_pdf_path.mkdir(parents=True, exist_ok=True)
@@ -64,7 +65,7 @@ def arxiv_download(config: Dict[str, Any], candidates: List[Dict[str, Any]], pat
             
             # If not, download and create new PDF paper
             try:
-                pdf_paper = fetch_arxiv_pdf_paper(arxiv_id, paper_metadata, source_pdf_path, keep_pdf=keep_pdf)
+                pdf_paper = fetch_paper_from_arxiv(arxiv_id, paper_metadata, source_pdf_path, keep_pdf=keep_pdf)
                 
                 if pdf_paper:
                     # Save parsed PDF paper to JSON
