@@ -1,7 +1,7 @@
 benchmark_name: "Spurious Correlation Benchmark"
 
 ### step 1: parameters used for scanning and filtering arxiv metadata database ###
-ARXIV_METADATA_SCANNING_PARAMETERS:
+ARXIV_METADATA_SCAN_PARAMETERS:
   
   # maximum number of metadata entries to scan from the arxiv dataset (-1 = no limit)
   max_metadata_scan_limit: -1  
@@ -30,7 +30,7 @@ ARXIV_METADATA_SCANNING_PARAMETERS:
 ARXIV_DOWNLOAD_PARAMETERS:
 
   # maximum number of ArXiv download calls. (-1 = no limit)
-  max_download_calls: 50
+  max_download_calls: -1
 
   # whether to store the downloaded PDF files in data/sources/ dir.
   save_files: true
@@ -41,11 +41,9 @@ ARXIV_DOWNLOAD_PARAMETERS:
 
 
 ### Step 3: parameters used for scanning and filtering parsed papers ###
-# For "latex" mode: scans parsed LaTeX sections for keywords
-# For "pdf" mode: scans first 10 pages of PDF for keywords
-PARSED_PAPER_SCANNING_PARAMETERS:
+PARSED_PAPER_FILTER_PARAMETERS:
 
-  # keywords to search for in parsed paper content (sections for LaTeX, first 10 pages for PDF)
+  # keywords to search for in parsed paper content (first 10 pages for PDF)
   content_keywords:
     - "Waterbirds"
 
@@ -54,9 +52,8 @@ PARSED_PAPER_SCANNING_PARAMETERS:
 
   
 
-
 ### Step 4: parameters used for LLM extraction phase ###
-LLM_EXTRACTION_PARAMETERS:
+LLM_ANALYSIS_PARAMETERS:
 
   # model name to use for extraction
   model_name: "gemini-2.5-flash"
