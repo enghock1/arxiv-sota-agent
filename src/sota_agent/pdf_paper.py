@@ -33,10 +33,9 @@ class ArxivPdfPaper:
         """
         return self.pdf_path if self.pdf_path else self._temp_pdf_path
     
-    def extract_text_for_filtering(self) -> str:
+    def get_raw_text(self) -> str:
         """
-        Get cached raw text for keyword filtering.
-        Text is extracted during paper creation (first 10 pages only).
+        Get cached raw text.
         
         Returns:
             Extracted text string
