@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from sota_agent.pdf_paper import ArxivPdfPaper
+from sota_agent.model.pdf_paper import ArxivPdfPaper
 
 
 def download_pdf_from_arxiv(arxiv_id: str, output_dir: Path, timeout: int = 30) -> Optional[Path]:

@@ -42,32 +42,34 @@ class ArxivPdfPaper:
         """
         return self.raw_text if self.raw_text else ""
     
-    def upload_to_gemini(self, client) -> str:
+    def upload_to_gemini(self, client):
         """
-        Uploads PDF to Gemini File API and caches the URI.
+        Uploads PDF to Gemini File API and caches the file object.
         
         Args:
             client: Gemini client instance with file upload capability
             
         Returns:
-            File URI string for use in Gemini API calls
+            Uploaded file object for use in Gemini API calls
         """
         if self.gemini_file_uri:
-            return self.gemini_file_uri  # Return cached URI
+            # Return cached file object (stored as URI, but in new API we need to re-upload or store object)
+            # For now, we'll upload each time if no cached object
+            pass
         
         # Get PDF path (permanent or temporary)
         pdf_path = self.get_pdf_path_for_upload()
         if not pdf_path or not pdf_path.exists():
             raise ValueError(f"PDF file not found for {self.arxiv_id}: {pdf_path}")
         
-        # Upload to Gemini File API
+        # Upload to Gemini File API (Google AI SDK)
         uploaded_file = client.files.upload(file=str(pdf_path))
-        self.gemini_file_uri = uploaded_file.uri
         
-        if not self.gemini_file_uri:
-            raise ValueError(f"Failed to upload PDF to Gemini for {self.arxiv_id}")
+        # Cache the URI for reference
+        if hasattr(uploaded_file, 'uri'):
+            self.gemini_file_uri = uploaded_file.uri
         
-        return self.gemini_file_uri
+        return uploaded_file
     
     def to_dict(self) -> Dict:
         """

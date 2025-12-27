@@ -1,1 +1,1 @@
-from .loader import get_google_project_id, load_config
+from .loader import get_google_ids_from_dotenv, load_config

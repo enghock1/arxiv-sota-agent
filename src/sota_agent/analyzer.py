@@ -8,10 +8,11 @@ from typing import List, Dict
 from sota_agent.client import GeminiAgentClient
 from sota_agent.model.pdf_paper import ArxivPdfPaper
 
-def analyze_papers(project_id: str, config: dict, papers: List[ArxivPdfPaper], paths: Dict[str, Path]) -> List[Dict]:
+def analyze_papers(google_keys: Dict[str, str], config: dict, papers: List[ArxivPdfPaper], paths: Dict[str, Path]) -> List[Dict]:
     """
     Analyzes the list of ArxivPdfPaper using LLM and Pydantic Model.
     Params:
+        google_keys: Dictionary of Google IDs.
         config: Configuration dictionary for LLM extraction.
         papers: List of ArxivPdfPaper objects to analyze.
         paths: Dictionary of relevant paths.
@@ -26,11 +27,14 @@ def analyze_papers(project_id: str, config: dict, papers: List[ArxivPdfPaper], p
     # get model name
     model_name = config.get("model_name", "gemini-2.5-flash")
 
-    # Initialize Vertex AI Client
+    # Initialize Gemini Client (using Google AI SDK for file uploads)
     try:
-        client = GeminiAgentClient(project_id=project_id, model_name=model_name)
+        client = GeminiAgentClient(
+            google_api_key=google_keys["GOOGLE_API_KEY"], 
+            model_name=model_name
+        )
     except Exception as e:
-        print(f"Vertex AI Init Failed: {e}")
+        print(f"Gemini Client Init Failed: {e}")
         sys.exit(1)
 
     # Apply safety limit
@@ -42,7 +46,7 @@ def analyze_papers(project_id: str, config: dict, papers: List[ArxivPdfPaper], p
     for pdf_paper in tqdm(papers_to_process, desc="Extracting", unit="papers"):
         try:
             # PDF mode: upload PDF to Gemini and analyze
-            entry = client.analyze_paper_from_pdf(pdf_paper, config['LLM_EXTRACTION_PARAMETERS'])
+            entry = client.analyze_paper_from_pdf(pdf_paper, config)
             print(f"Extracted Entry: {entry}\n")
             
             if entry and entry.metric_value is not None:

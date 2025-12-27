@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 
 from sota_agent.utils import (load_config,
-                              get_google_project_id)
+                              get_google_ids_from_dotenv)
 from sota_agent import (scan_arxiv_metadata,
                         download_arxiv_papers,
                         filter_papers,
@@ -20,8 +20,8 @@ PATHS = {
 def main(config_yaml: Path):
 
     # get google project id from .env
-    project_id = get_google_project_id()
-    print(f"Google project id used: {project_id}.")
+    google_keys = get_google_ids_from_dotenv()
+    print(f"Google project ids used: {google_keys}.")
 
     # load config file
     config = load_config(config_yaml)
@@ -41,13 +41,14 @@ def main(config_yaml: Path):
     filtered_papers = filter_papers(config['PARSED_PAPER_FILTER_PARAMETERS'], parsed_papers, PATHS)
     ################################
 
-    quit()
+
 
     ### Step 4: LLM extraction phase ###
-    results = analyze_papers(project_id, config['LLM_ANALYSIS_PARAMETERS'], filtered_papers, PATHS)
+    results = analyze_papers(google_keys, config['LLM_ANALYSIS_PARAMETERS'], filtered_papers, PATHS)
     ##################################
 
 
+    quit()
 
 
 if __name__ == "__main__":

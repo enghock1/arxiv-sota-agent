@@ -13,16 +13,14 @@ from sota_agent.model.pdf_paper import ArxivPdfPaper
 logger = logging.getLogger(__name__)
 
 class GeminiAgentClient:
-    def __init__(self, project_id: str, location: str = "global", model_name: str ="gemini-2.5-flash"):
-        self.project_id = project_id
+    def __init__(self, google_api_key: str, location: str = "us-central1", model_name: str ="gemini-2.5-flash"):
+        self.google_api_key = google_api_key
         self.location = location
         self.model_name = model_name
         
-        # Initialize Gemini client with Vertex AI
+        # get GOOGLE_API_KEY from google_keys
         self.client = genai.Client(
-            vertexai=True,
-            project=self.project_id,
-            location=self.location
+            api_key=self.google_api_key
         )
     
     def analyze_paper_from_pdf(self, pdf_paper: ArxivPdfPaper, config: Dict[str, Any]) -> Optional[SOTAEntry]:
@@ -79,7 +77,7 @@ class GeminiAgentClient:
 
             --- PAPER METADATA ---
             TITLE: {pdf_paper.metadata.get('title', 'N/A')}
-
+    
             IMPORTANT: You have access to the full PDF document. Do not truncate your analysis - examine all main pages, especially later sections containing results and experiments. You can ignore references and appendices.
         """ 
         
@@ -93,28 +91,23 @@ class GeminiAgentClient:
         logger.info(f"Analyzing PDF: {pdf_paper.arxiv_id}")
         
         try:
-            # Upload PDF to Gemini and get file URI
-            file_uri = pdf_paper.upload_to_gemini(self.client)
-            logger.info(f"PDF uploaded: {file_uri}")
+            # Upload PDF to Gemini and get file object
+            uploaded_file = pdf_paper.upload_to_gemini(self.client)
+            logger.info(f"PDF uploaded: {uploaded_file}")
             
-            # Create multimodal content with PDF file + prompt
-            contents = [
-                types.Part.from_uri(file_uri=file_uri, mime_type="application/pdf"),
-                types.Part.from_text(text=system_prompt)
-            ]
-            
-            # Enforce JSON Output using the Pydantic Schema
-            generation_config = types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=SOTAEntry.model_json_schema(),
-                temperature=0.0,  # Deterministic output
-            )
-            
-            # Call LLM with PDF + prompt
+            # setup output content structure using Pydantic Model
+            generator_config = types.GenerateContentConfig(
+                                    response_mime_type="application/json",
+                                    response_schema=SOTAEntry.model_json_schema(),
+                                    temperature=0.0,
+                                )
+
+            # Call LLM with PDF file + prompt (using Google AI SDK)
+            # Pass uploaded file object directly
             response = self.client.models.generate_content(
                 model=self.model_name,
-                contents=contents,
-                config=generation_config
+                contents=[system_prompt, uploaded_file],
+                config=generator_config
             )
             
             # Parse and validate response
