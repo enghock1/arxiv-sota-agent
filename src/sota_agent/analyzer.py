@@ -67,21 +67,5 @@ def analyze_papers(google_keys: Dict[str, str], config: dict, papers: List[Arxiv
             title = pdf_paper.metadata.get('title', 'Unknown')
             tqdm.write(f"Failed to process '{title[:20]}...': {e}")
 
-    # save output
-    paths['OUTPUT'].mkdir(parents=True, exist_ok=True)
-    
-    if results:
-        df = pd.DataFrame(results).sort_values(by="Metric", ascending=False)
-        output_file = paths['OUTPUT'] / "leaderboard.csv"
-        df.to_csv(output_file, index=False)
-        
-        print("leaderboard")
-        print(df[["Paper Title", "Application", "Domain", "Pipeline Stage", "Strategy", "Metric", "Evidence", "Dataset Mentioned"]].to_markdown(index=False))
-        print(f"\nSaved to {output_file}")
-    else:
-        print("\nNo valid metrics extracted from candidates.")
-
-
-
 
     return results

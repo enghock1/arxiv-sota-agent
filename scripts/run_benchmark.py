@@ -1,4 +1,5 @@
 import argparse
+import pandas as pd
 from pathlib import Path
 
 from sota_agent.utils import (load_config,
@@ -45,10 +46,22 @@ def main(config_yaml: Path):
 
     ### Step 4: LLM extraction phase ###
     results = analyze_papers(google_keys, config['LLM_ANALYSIS_PARAMETERS'], filtered_papers, PATHS)
-    ##################################
+    ################################
 
-
-    quit()
+    ### Step 5: Save results ###
+    PATHS['OUTPUT'].mkdir(parents=True, exist_ok=True)
+    
+    if results:
+        df = pd.DataFrame(results).sort_values(by="Metric", ascending=False)
+        output_file = PATHS['OUTPUT'] / "leaderboard.csv"
+        df.to_csv(output_file, index=False)
+        
+        print("leaderboard")
+        print(df[["Paper Title", "Application", "Domain", "Pipeline Stage", "Strategy", "Metric", "Evidence", "Dataset Mentioned"]].to_markdown(index=False))
+        print(f"\nSaved to {output_file}")
+    else:
+        print("\nNo valid metrics extracted from candidates.")
+    #################################
 
 
 if __name__ == "__main__":

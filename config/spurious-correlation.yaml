@@ -58,7 +58,7 @@ LLM_ANALYSIS_PARAMETERS:
   # model name to use for extraction
   model_name: "gemini-2.5-flash"
 
-  max_llm_calls: 10
+  max_llm_calls: -1
 
   selected_dataset_names:
     - "Waterbirds"
