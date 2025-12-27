@@ -1,19 +1,12 @@
-import os
 import sys
 import yaml
 from pathlib import Path
 from typing import Dict, Any
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
-def get_google_project_id() -> str:
-    # get google project id from .env
-    load_dotenv()
-    project_id = os.getenv("GOOGLE_PROJECT_ID")
-    if not project_id:
-        print("Error: GOOGLE_PROJECT_ID not set.")
-        sys.exit(1)
 
-    return project_id
+def get_google_ids_from_dotenv() -> Dict[str, str]:
+    return {k: v for k, v in dotenv_values().items() if v is not None}
 
 
 def load_config(config_path: Path) -> Dict[str, Any]:
