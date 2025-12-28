@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from google import genai
 from google.genai import types
@@ -41,8 +42,9 @@ class GeminiAgentClient:
         metric_name = list(config['metrics'].keys())[0]
         metric_desc = config['metrics'][metric_name]
         
-        # Extract pipeline stages
-        stages_str = ", ".join([f"'{s}'" for s in config['pipeline_stages']])
+        # Extract hierarchical taxonomy
+        taxonomy_hierarchy = config.get('taxonomy_hierarchy', {})
+        taxonomy_str = json.dumps(taxonomy_hierarchy, indent=2)
         
         # Construct the System Prompt for PDF analysis
         system_prompt = f"""
@@ -52,10 +54,29 @@ class GeminiAgentClient:
             DATASET: {dataset_name}
             METRIC: {metric_name} (description: {metric_desc})
 
-            --- ALLOWED STAGES ---
-            You must classify the method into one of these strict Pipeline Stages:
-            {stages_str}
+            --- HIERARCHICAL TAXONOMY ---
+            
+            You MUST classify the method using this two-level taxonomy:
+            {taxonomy_str}
+            
+            Classification Rules:
+            1. taxonomy_level_1 MUST be one of the keys from the taxonomy JSON above.
+            2. taxonomy_level_2 MUST be one of the array values under your selected taxonomy_level_1 key.
+            3. Ensure your Level 2 selection is a valid subcategory that appears in the array for your chosen Level 1 category.
 
+            --- PAPER TYPE CLASSIFICATION ---
+            
+            You MUST classify the paper into ONE of these types:
+            
+            • "Method" - Proposes a new algorithm, model, architecture, or technique with empirical validation.
+            • "Theoretical" - Mathematical analysis, proofs, theoretical guarantees, or complexity studies.
+            • "Survey" - Comprehensive review, survey, or systematic overview of existing literature.
+            • "Benchmark" - Introduces a new dataset, evaluation framework, or benchmarking study.
+            • "Analysis" - Empirical analysis, ablation study, or comparison of existing methods without proposing new ones.
+            • "Position" - Opinion paper, perspective piece, or discussion of future research directions.
+            
+            Select the paper_type that best describes the PRIMARY contribution of this work.
+            
             --- INSTRUCTIONS ---
             1. **Scan the ENTIRE PDF document** paying special attention to:
             - Results section
@@ -63,17 +84,23 @@ class GeminiAgentClient:
             - Tables showing performance metrics
             - Figures with performance comparisons
 
-            2. **method_name**: Prefer the acronym. If none, use the shortest distinct name.
+            2. **paper_type**: Determine if the paper is introducing a novel method
 
-            3. **metric_value**: Extract the exact numeric value for {metric_name}.
+            2. **taxonomy_level_1**: Select the main category that best describes the paper's approach.
+
+            3. **taxonomy_level_2**: Select the specific subcategory under your chosen Level 1 category.
+
+            4. **method**: Extract the name of the algorithmic method or approach proposed in the paper. Use the common terminology. If the paper introduces a variant of an existing method, use the base method name.
+
+            5. **metric_value**: Extract the exact numeric value for {metric_name}.
             - If the text says "85.5%", return 0.855.
             - Look carefully in tables, figures, and text.
             - Sometimes it may not use the exact metric name, infer based on context.
             - If not reported, set to null.
 
-            4. **evidence**: You MUST provide a direct, verbatim quote from the PDF that supports the extracted metric, or mention which figure/table if extracted from a figure or table.
+            6. **evidence**: You MUST provide a direct, verbatim quote from the PDF that supports the extracted metric, or mention which figure/table if extracted from a figure or table.
 
-            5. **dataset_mentioned**: Specific check if {dataset_name} is explicitly tested or mentioned.
+            7. **dataset_mentioned**: Specific check if {dataset_name} is explicitly tested or mentioned.
 
             --- PAPER METADATA ---
             TITLE: {pdf_paper.metadata.get('title', 'N/A')}

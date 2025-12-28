@@ -55,9 +55,6 @@ def main(config_yaml: Path):
         df = pd.DataFrame(results).sort_values(by="Metric", ascending=False)
         output_file = PATHS['OUTPUT'] / "leaderboard.csv"
         df.to_csv(output_file, index=False)
-        
-        print("leaderboard")
-        print(df[["Paper Title", "Application", "Domain", "Pipeline Stage", "Strategy", "Metric", "Evidence", "Dataset Mentioned"]].to_markdown(index=False))
         print(f"\nSaved to {output_file}")
     else:
         print("\nNo valid metrics extracted from candidates.")
