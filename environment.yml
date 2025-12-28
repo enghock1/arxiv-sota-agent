@@ -4,6 +4,7 @@ channels:
 dependencies:
   - pandas
   - numpy
+  - matplotlib
   - cryptography
   - google-cloud-aiplatform[version='>=1.130.0']
   - shapely
