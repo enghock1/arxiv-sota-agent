@@ -51,6 +51,8 @@ def analyze_papers(google_keys: Dict[str, str], config: dict, papers: List[Arxiv
             
             if entry and entry.metric_value is not None:
                 results.append({
+                    "Arxiv ID": pdf_paper.metadata.get('id', 'N/A'),
+                    "Date": pdf_paper.metadata.get('update_date', 'N/A'),
                     "Paper Title": entry.paper_title,
                     "Application": entry.application_field,
                     "Domain": entry.domain,
