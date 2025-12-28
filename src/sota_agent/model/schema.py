@@ -1,11 +1,17 @@
+from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 class SOTAEntry(BaseModel):
     paper_title: str = Field(..., description="Title of the research paper.")
     application_field: str = Field(..., description="Application field of the research (e.g., healthcare, materials science, theory, general).")
     domain: str = Field(..., description="Domain of the research (e.g., Computer Vision, NLP).")
-    pipeline: str = Field(..., description="Taxonomy pipeline stage specified in yaml config.")
-    strategy: str = Field(..., description="Name of the specific algorithmic strategy used in each stage.")
+    paper_type: Literal["Method", "Theoretical", "Survey", "Benchmark", "Analysis", "Position"] = Field(
+        ..., 
+        description="Type of research paper. Must be one of: Method, Theoretical, Survey, Benchmark, Analysis, Position."
+    )
+    taxonomy_level_1: str = Field(..., description="Level 1 taxonomy specified in yaml config.")
+    taxonomy_level_2: str = Field(..., description="Level 2 taxonomy specified in yaml config.")
+    method: str = Field(..., description="Name of the algorithmic method or approach proposed in the paper.")
     metric_value: float = Field(..., description="Performance metric. Return -1.0 if not reported.")
     evidence: str = Field(..., description=" Quote from text supporting the metric.")
     dataset_mentioned: bool = Field(..., description="Indicates if the dataset is mentioned in the paper.")
@@ -19,7 +25,7 @@ class SOTAEntry(BaseModel):
     @field_validator('domain', mode='before')
     @classmethod
     def clean_domain(cls, v: str) -> str:
-        return v.strip().title()
+        return v.strip()
     
     @field_validator('application_field', mode='before')
     @classmethod
@@ -29,17 +35,22 @@ class SOTAEntry(BaseModel):
     @field_validator('evidence', mode='before')
     @classmethod
     def clean_evidence(cls, v: str) -> str:
-        return v.strip().title()
+        return v.strip()
 
-    @field_validator('pipeline', mode='before')
+    @field_validator('taxonomy_level_1', mode='before')
     @classmethod
-    def clean_pipeline(cls, v: str) -> str:
-        return v.strip().title()
+    def clean_taxonomy_level_1(cls, v: str) -> str:
+        return v.strip()
 
-    @field_validator('strategy', mode='before')
+    @field_validator('taxonomy_level_2', mode='before')
     @classmethod
-    def clean_strategy(cls, v: str) -> str:
-        return v.strip().title()
+    def clean_taxonomy_level_2(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator('method', mode='before')
+    @classmethod
+    def clean_method(cls, v: str) -> str:
+        return v.strip()
 
     @field_validator("metric_value", mode="before")
     @classmethod

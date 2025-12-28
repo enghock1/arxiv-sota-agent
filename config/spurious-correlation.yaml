@@ -63,11 +63,31 @@ LLM_ANALYSIS_PARAMETERS:
   selected_dataset_names:
     - "Waterbirds"
 
-  pipeline_stages: 
-    - "Data-Centric" # data augmentation, balancing, reweighting
-    - "Representation Learning" # invariant learning, contrastive learning, feature disentanglement
-    - "Post-hoc Methods" # finetuning, ensemble learning, calibration
-    - "Others"
+  # taxonomy hierarchy for classification
+  taxonomy_hierarchy: 
+    "Data-Centric":
+      - "Data Augmentation"
+      - "Data Balancing"
+      - "Concept and Pseudo-label Discovery"
+      - "Others"
+    
+    "Representation Learning":
+      - "Causal Intervention"
+      - "Invariant Learning"
+      - "Feature Disentanglement"
+      - "Contrastive Learning"
+      - "Others"
+
+    "Post-hoc Methods": 
+      - "Identification then Mitigation"
+      - "Finetuning"
+      - "Optimization-based Methods"
+      - "Ensemble Learning"
+      - "Adversarial Training"
+      - "Others"
+
+    "Others":
+      - "Others"
 
   # performance metric to extract. key = metric name, value = metric description
   metrics:
