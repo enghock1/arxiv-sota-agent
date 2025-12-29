@@ -2,209 +2,136 @@ import json
 import tempfile
 from pathlib import Path
 
-from sota_agent.paper import ArxivPaper
-from .sample import (sample_metadata, sample_latex_text, sample_latex_with_subsections, sample_latex_minimal)
+from sota_agent.model.pdf_paper import ArxivPdfPaper
+from .sample import sample_metadata
 
 
-class TestArxivPaperInit:
-    """Test initialization of ArxivPaper."""
+class TestArxivPdfPaperInit:
+    """Test initialization of ArxivPdfPaper."""
     
     def test_init_with_minimal_args(self):
         """Test creating paper with only required arguments."""
-        paper = ArxivPaper(arxiv_id="2301.12345")
+        paper = ArxivPdfPaper(arxiv_id="2301.12345")
         
         assert paper.arxiv_id == "2301.12345"
-        assert paper.source_path is None
+        assert paper.pdf_path is None
         assert paper.metadata == {}
         assert paper.raw_text is None
-        assert paper.sections == []
-        assert paper.parsed_date is None
+        assert paper.gemini_file_uri is None
+        assert paper.downloaded_date is None
     
     def test_init_with_metadata(self, sample_metadata):
         """Test creating paper with metadata."""
-        paper = ArxivPaper(
+        paper = ArxivPdfPaper(
             arxiv_id="2301.12345",
-            source_path=Path("/path/to/source.tex"),
+            pdf_path=Path("/path/to/paper.pdf"),
             metadata=sample_metadata
         )
         
         assert paper.metadata == sample_metadata
         assert paper.metadata["title"] == "Test Paper"
+        assert paper.pdf_path == Path("/path/to/paper.pdf")
+    
+    def test_init_with_pdf_path_string(self):
+        """Test creating paper with PDF path as string."""
+        paper = ArxivPdfPaper(
+            arxiv_id="2301.12345",
+            pdf_path="/path/to/paper.pdf"
+        )
+        
+        assert paper.pdf_path == Path("/path/to/paper.pdf")
 
 
-class TestParseSections:
-    """Test section parsing functionality."""
+class TestGetPdfPath:
+    """Test PDF path retrieval."""
     
-    def test_parse_latex_sections(self, sample_latex_text):
-        """Test parsing LaTeX text with sections."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_text)
+    def test_get_pdf_path_with_permanent_path(self):
+        """Test getting PDF path when permanent path is set."""
+        paper = ArxivPdfPaper(
+            arxiv_id="2301.12345",
+            pdf_path=Path("/path/to/paper.pdf")
+        )
         
-        assert len(paper.sections) > 0
-        assert paper.raw_text == sample_latex_text
-        assert paper.parsed_date is not None
-        
-        # Check that some expected sections are present
-        section_titles = [s['title'] for s in paper.sections]
-        assert any('Introduction' in title for title in section_titles)
-        assert any('Conclusion' in title for title in section_titles)
+        assert paper.get_pdf_path_for_upload() == Path("/path/to/paper.pdf")
     
-    def test_parse_latex_with_subsections(self, sample_latex_with_subsections):
-        """Test parsing LaTeX with subsections."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_with_subsections)
+    def test_get_pdf_path_with_temp_path(self):
+        """Test getting PDF path when only temp path is set."""
+        paper = ArxivPdfPaper(arxiv_id="2301.12345")
+        paper._temp_pdf_path = Path("/tmp/paper.pdf")
         
-        # Should parse sections and subsections
-        assert len(paper.sections) >= 1
-        assert paper.raw_text == sample_latex_with_subsections
+        assert paper.get_pdf_path_for_upload() == Path("/tmp/paper.pdf")
     
-    def test_parse_minimal_latex(self, sample_latex_minimal):
-        """Test parsing minimal LaTeX document."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_minimal)
+    def test_get_pdf_path_permanent_over_temp(self):
+        """Test that permanent path takes precedence over temp path."""
+        paper = ArxivPdfPaper(
+            arxiv_id="2301.12345",
+            pdf_path=Path("/path/to/paper.pdf")
+        )
+        paper._temp_pdf_path = Path("/tmp/paper.pdf")
         
-        # Should parse abstract and sections
-        assert len(paper.sections) >= 1
-        assert paper.raw_text == sample_latex_minimal
-    
-    def test_parse_no_clear_sections(self):
-        """Test parsing text with no clear section headers."""
-        paper = ArxivPaper(arxiv_id="test")
-        text = "This is just plain text without any LaTeX section commands at all."
-        paper.parse(text)
-        
-        # May not find sections without \section{} commands
-        assert len(paper.sections) >= 0
-    
-    def test_section_order_preserved(self, sample_latex_text):
-        """Test that section order is preserved."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_text)
-        
-        orders = [s['order'] for s in paper.sections]
-        assert orders == sorted(orders)  # Should be in ascending order
+        assert paper.get_pdf_path_for_upload() == Path("/path/to/paper.pdf")
 
 
-class TestGetRelevantSections:
-    """Test filtering of relevant sections."""
+class TestGetRawText:
+    """Test raw text retrieval."""
     
-    def test_exclude_references_section(self, sample_latex_text):
-        """Test that references/bibliography sections are excluded."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_text)
+    def test_get_raw_text_with_text(self):
+        """Test getting raw text when it exists."""
+        paper = ArxivPdfPaper(arxiv_id="2301.12345")
+        paper.raw_text = "This is extracted text from the PDF."
         
-        relevant = paper.get_relevant_sections()
-        relevant_titles = [s['title'].lower() for s in relevant]
-        
-        # Should not have references or bibliography
-        assert 'references' not in relevant_titles
-        assert 'bibliography' not in relevant_titles
+        assert paper.get_raw_text() == "This is extracted text from the PDF."
     
-    def test_exclude_appendix(self, sample_latex_minimal):
-        """Test that appendix is excluded."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_minimal)
+    def test_get_raw_text_when_none(self):
+        """Test getting raw text when it's None."""
+        paper = ArxivPdfPaper(arxiv_id="2301.12345")
         
-        relevant = paper.get_relevant_sections()
-        relevant_titles = [s['title'].lower() for s in relevant]
-        
-        assert not any('appendix' in title for title in relevant_titles)
-    
-    def test_custom_exclude_list(self, sample_latex_text):
-        """Test using custom exclude list."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_text)
-        
-        relevant = paper.get_relevant_sections(exclude_list=['introduction', 'conclusion'])
-        relevant_titles = [s['title'].lower() for s in relevant]
-        
-        assert not any('introduction' in title for title in relevant_titles)
-        assert not any('conclusion' in title for title in relevant_titles)
-    
-    def test_keep_method_sections(self, sample_latex_text):
-        """Test that important sections are kept."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_text)
-        
-        relevant = paper.get_relevant_sections()
-        
-        # Should have some relevant sections
-        assert len(relevant) > 0
-
-
-class TestGetTextForLLM:
-    """Test LLM text generation functionality."""
-    
-    def test_get_text_basic(self, sample_latex_text, sample_metadata):
-        """Test getting text for LLM with basic options."""
-        paper = ArxivPaper(arxiv_id="test", metadata=sample_metadata)
-        paper.parse(sample_latex_text)
-        
-        text = paper.get_text_for_llm()
-        
-        assert len(text) > 0
-        assert sample_metadata['abstract'] in text  # Abstract should be included
-    
-    def test_get_text_without_abstract(self, sample_latex_text, sample_metadata):
-        """Test getting text without abstract."""
-        paper = ArxivPaper(arxiv_id="test", metadata=sample_metadata)
-        paper.parse(sample_latex_text)
-        
-        text = paper.get_text_for_llm(include_abstract=False)
-        
-        assert sample_metadata['abstract'] not in text
-    
-    def test_get_text_with_max_chars(self, sample_latex_text):
-        """Test text truncation with max_chars."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_text)
-        
-        max_chars = 200
-        text = paper.get_text_for_llm(max_chars=max_chars)
-        
-        assert len(text) <= max_chars + 50  # Allow some buffer for truncation message
-        assert "[Text truncated...]" in text
-    
-    def test_get_text_no_metadata_abstract(self, sample_latex_text):
-        """Test getting text when metadata has no abstract."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse(sample_latex_text)
-        
-        text = paper.get_text_for_llm(include_abstract=True)
-        
-        # Should not crash, just skip abstract
-        assert len(text) > 0
+        assert paper.get_raw_text() == ""
 
 
 class TestSerialization:
     """Test JSON serialization and deserialization."""
     
-    def test_to_dict(self, sample_metadata, sample_latex_text):
+    def test_to_dict(self, sample_metadata):
         """Test converting paper to dictionary."""
-        paper = ArxivPaper(
+        paper = ArxivPdfPaper(
             arxiv_id="2301.12345",
-            source_path=Path("/path/to/source.tex"),
+            pdf_path=Path("/path/to/paper.pdf"),
             metadata=sample_metadata
         )
-        paper.parse(sample_latex_text)
+        paper.raw_text = "Extracted text content"
+        paper.gemini_file_uri = "gs://bucket/file.pdf"
+        paper.downloaded_date = "2025-12-28"
         
         data = paper.to_dict()
         
         assert data['arxiv_id'] == "2301.12345"
-        assert data['source_path'] == "/path/to/source.tex"
+        assert data['pdf_path'] == "/path/to/paper.pdf"
         assert data['metadata'] == sample_metadata
-        assert len(data['sections']) > 0
-        assert data['parsed_date'] is not None
+        assert data['raw_text'] == "Extracted text content"
+        assert data['gemini_file_uri'] == "gs://bucket/file.pdf"
+        assert data['downloaded_date'] == "2025-12-28"
     
-    def test_save_to_json(self, sample_metadata, sample_latex_text):
+    def test_to_dict_with_none_values(self):
+        """Test converting paper with None values to dictionary."""
+        paper = ArxivPdfPaper(arxiv_id="2301.12345")
+        
+        data = paper.to_dict()
+        
+        assert data['arxiv_id'] == "2301.12345"
+        assert data['pdf_path'] is None
+        assert data['metadata'] == {}
+        assert data['raw_text'] is None
+    
+    def test_save_to_json(self, sample_metadata):
         """Test saving paper to JSON file."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            paper = ArxivPaper(
+            paper = ArxivPdfPaper(
                 arxiv_id="2301.12345",
-                source_path=Path("/path/to/source.tex"),
+                pdf_path=Path("/path/to/paper.pdf"),
                 metadata=sample_metadata
             )
-            paper.parse(sample_latex_text)
+            paper.raw_text = "Extracted text"
             
             output_path = Path(tmpdir) / "test_paper.json"
             paper.save_to_json(output_path)
@@ -216,40 +143,42 @@ class TestSerialization:
                 data = json.load(f)
             
             assert data['arxiv_id'] == "2301.12345"
-            assert len(data['sections']) > 0
+            assert data['raw_text'] == "Extracted text"
     
-    def test_from_json(self, sample_metadata, sample_latex_text):
+    def test_from_json(self, sample_metadata):
         """Test loading paper from JSON file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create and save a paper
-            paper1 = ArxivPaper(
+            paper1 = ArxivPdfPaper(
                 arxiv_id="2301.12345",
-                source_path=Path("/path/to/source.tex"),
+                pdf_path=Path("/path/to/paper.pdf"),
                 metadata=sample_metadata
             )
-            paper1.parse(sample_latex_text)
+            paper1.raw_text = "Extracted text"
+            paper1.gemini_file_uri = "gs://bucket/file.pdf"
+            paper1.downloaded_date = "2025-12-28"
             
             json_path = Path(tmpdir) / "test_paper.json"
             paper1.save_to_json(json_path)
             
             # Load it back
-            paper2 = ArxivPaper.from_json(json_path)
+            paper2 = ArxivPdfPaper.from_json(json_path)
             
             assert paper2.arxiv_id == paper1.arxiv_id
-            assert paper2.source_path == paper1.source_path
+            assert paper2.pdf_path == paper1.pdf_path
             assert paper2.metadata == paper1.metadata
-            assert len(paper2.sections) == len(paper1.sections)
-            assert paper2.parsed_date == paper1.parsed_date
+            assert paper2.raw_text == paper1.raw_text
+            assert paper2.gemini_file_uri == paper1.gemini_file_uri
+            assert paper2.downloaded_date == paper1.downloaded_date
     
     def test_save_creates_parent_directories(self, sample_metadata):
         """Test that save_to_json creates parent directories."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            paper = ArxivPaper(
+            paper = ArxivPdfPaper(
                 arxiv_id="2301.12345",
-                source_path=Path("/path/to/source.tex"),
+                pdf_path=Path("/path/to/paper.pdf"),
                 metadata=sample_metadata
             )
-            paper.parse("Some text")
             
             # Use nested path that doesn't exist
             output_path = Path(tmpdir) / "nested" / "dir" / "paper.json"
@@ -261,59 +190,52 @@ class TestSerialization:
 class TestRepr:
     """Test string representation."""
     
-    def test_repr(self, sample_latex_text):
-        """Test __repr__ method."""
-        paper = ArxivPaper(arxiv_id="2301.12345")
-        paper.parse(sample_latex_text)
+    def test_repr_with_pdf(self):
+        """Test __repr__ method with PDF path."""
+        paper = ArxivPdfPaper(
+            arxiv_id="2301.12345",
+            pdf_path=Path("/path/to/paper.pdf")
+        )
         
         repr_str = repr(paper)
         
         assert "2301.12345" in repr_str
-        assert "sections" in repr_str.lower()
-        assert str(len(paper.sections)) in repr_str
+        assert "pdf=Yes" in repr_str
+    
+    def test_repr_without_pdf(self):
+        """Test __repr__ method without PDF path."""
+        paper = ArxivPdfPaper(arxiv_id="2301.12345")
+        
+        repr_str = repr(paper)
+        
+        assert "2301.12345" in repr_str
+        assert "pdf=No" in repr_str
 
 
 class TestEdgeCases:
     """Test edge cases and error handling."""
     
-    def test_empty_text(self):
-        """Test parsing empty text."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse("")
+    def test_empty_metadata(self):
+        """Test paper with empty metadata."""
+        paper = ArxivPdfPaper(arxiv_id="2301.12345", metadata={})
         
-        # Should handle gracefully
-        assert len(paper.sections) >= 0
+        assert paper.metadata == {}
     
-    def test_very_short_text(self):
-        """Test parsing very short text."""
-        paper = ArxivPaper(arxiv_id="test")
-        paper.parse("Short")
+    def test_arxiv_id_with_version(self):
+        """Test ArXiv ID with version suffix."""
+        paper = ArxivPdfPaper(arxiv_id="2301.12345v2")
         
-        # Should not crash
-        assert paper.raw_text == "Short"
+        assert paper.arxiv_id == "2301.12345v2"
     
-    def test_special_characters_in_text(self):
-        """Test parsing text with special characters."""
-        paper = ArxivPaper(arxiv_id="test")
-        text = r"\section{Introducción}" + "\nContenido con caracteres especiales: é, ñ, ü"
-        paper.parse(text)
+    def test_metadata_with_special_characters(self):
+        """Test metadata with special characters."""
+        metadata = {
+            "title": "Paper with Spëcial Chàracters",
+            "abstract": "Contains émojis 🔬 and símbolos"
+        }
+        paper = ArxivPdfPaper(arxiv_id="2301.12345", metadata=metadata)
         
-        # Should handle special characters
-        assert paper.raw_text == text
-    
-    def test_multiple_parse_calls(self, sample_latex_text):
-        """Test calling parse multiple times."""
-        paper = ArxivPaper(arxiv_id="test")
-        
-        paper.parse("First text")
-        first_date = paper.parsed_date
-        
-        paper.parse(sample_latex_text)
-        second_date = paper.parsed_date
-        
-        # Should update with new data
-        assert paper.raw_text == sample_latex_text
-        assert first_date != second_date
+        assert paper.metadata["title"] == "Paper with Spëcial Chàracters"
 
 
 # Run tests with: pytest tests/test_arxiv_paper.py -v
