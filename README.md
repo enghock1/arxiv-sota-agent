@@ -26,8 +26,21 @@ This repository mainly performs 4 steps:
     - Method classifications (mapped to a pre-specified hierarchical taxonomy)
     - Paper metadata (title, domain, application)
     - Benchmark dataset mentions and evidence citations
+    - And more
 
 The output is a structured dataset/leaderboard that can be used for downstream analysis, systematic reviews, and benchmark tracking.
+
+
+## Disclaimer
+
+This is a personal project designed to help with my own research workflow. While functional, it is still a work in progress and may contain bugs. If you encounter issues or have ideas for new features, please feel free to open an issue or submit a pull request!
+
+
+## Limitation
+
+- The pipeline relies on 2-step filtering process to reduce the number of candidates before LLM API calls. To avoid exessive costs, consider adjusting keyword filters to keep the list of candidate papers minimal before triggering API calls.
+- This repo is designed specifically for arXiv papers. It may not function with other public publication databases.
+- Current implementation is optimized for Google Gemini. However, support for other multimodal models can be added by extending the client wrapper class.
 
 
 ## Installation
@@ -76,7 +89,7 @@ GOOGLE_API_KEY=your_google_api_key_here
 ## Test the main script:
 
 ```bash
-python scripts/run_benchmark.py --config_yaml config/spurious-correlation.yaml
+python scripts/run_pipeline.py --config_yaml config/spurious-correlation.yaml
 ```
 
 
@@ -94,7 +107,7 @@ arxiv-sota-agent/
 │   ├── parsed_papers/              # Parsed paper objects
 │   └── processed/                  # Output results
 ├── scripts/
-│   ├── run_benchmark.py            # Main pipeline script
+│   ├── run_pipeline.py            # Main pipeline script
 ├── src/sota_agent/
 │   ├── client.py                   # Gemini API client wrapper
 │   ├── model/
