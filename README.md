@@ -109,11 +109,16 @@ arxiv-sota-agent/
 ├── scripts/
 │   ├── run_pipeline.py            # Main pipeline script
 ├── src/sota_agent/
+│   ├── analyzer.py                 # LLM analyzer
+│   ├── arxiv_download.py           # arxiv pdf download
 │   ├── client.py                   # Gemini API client wrapper
+│   ├── filter.py                   # arxiv pdf filter
+│   ├── scanner.py                  # arxiv metadata scanner
 │   ├── model/
 │   │   ├── schema.py               # Pydantic data schemas
 │   │   └── pdf_paper.py            # Paper parsing utilities
-│   └── utils.py                    # Helper functions
+│   └── utils/                      # Helper functions
+├── tests/                          # unittest
 ├── .env                            # Google API credentials (not in repo)
 ├── environment.yml                 # Conda environment
 ├── pyproject.toml                  # Python package config
