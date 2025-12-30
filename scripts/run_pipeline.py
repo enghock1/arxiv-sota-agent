@@ -1,3 +1,4 @@
+import os
 import argparse
 import pandas as pd
 from pathlib import Path
@@ -43,17 +44,18 @@ def main(config_yaml: Path):
     ################################
 
 
-
     ### Step 4: LLM extraction phase ###
     results = analyze_papers(google_keys, config['LLM_ANALYSIS_PARAMETERS'], filtered_papers, PATHS)
     ################################
 
-    ### Step 5: Save results ###
+
+    ### Step 5: Save results to output data/processed directory ###
     PATHS['OUTPUT'].mkdir(parents=True, exist_ok=True)
     
     if results:
+        config_fn = os.path.basename(config_yaml).split(',')[0]
         df = pd.DataFrame(results).sort_values(by="Metric", ascending=False)
-        output_file = PATHS['OUTPUT'] / "leaderboard.csv"
+        output_file = PATHS['OUTPUT'] / f"leaderboard-{config_fn}.csv"
         df.to_csv(output_file, index=False)
         print(f"\nSaved to {output_file}")
     else:
@@ -64,7 +66,7 @@ def main(config_yaml: Path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run SOTA Benchmarking on ArXiv Papers.")
     parser.add_argument("--config_yaml", type=str, default="config/benchmark_config.yaml",
-                        help="Path to the benchmark configuration YAML file.")
+                        help="Path to the configuration YAML file.")
     args = parser.parse_args()
 
     main(Path(args.config_yaml))

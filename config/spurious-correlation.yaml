@@ -39,7 +39,6 @@ ARXIV_DOWNLOAD_PARAMETERS:
   save_parsed_papers: true
 
 
-
 ### Step 3: parameters used for scanning and filtering parsed papers ###
 PARSED_PAPER_FILTER_PARAMETERS:
 
@@ -50,7 +49,6 @@ PARSED_PAPER_FILTER_PARAMETERS:
   # whether to preview parsed papers after downloading. Will save in data/processed/ dir.
   preview_filtered_papers: true
 
-  
 
 ### Step 4: parameters used for LLM extraction phase ###
 LLM_ANALYSIS_PARAMETERS:
