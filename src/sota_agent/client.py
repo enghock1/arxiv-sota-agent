@@ -76,7 +76,7 @@ class GeminiAgentClient:
             • "Position" - Opinion paper, perspective piece, or discussion of future research directions.
             
             Select the paper_type that best describes the PRIMARY contribution of this work.
-            
+
             --- INSTRUCTIONS ---
             1. **Scan the ENTIRE PDF document** paying special attention to:
             - Results section
@@ -108,11 +108,11 @@ class GeminiAgentClient:
             IMPORTANT: You have access to the full PDF document. Do not truncate your analysis - examine all main pages, especially later sections containing results and experiments. You can ignore references and appendices.
         """ 
         
-        # Save final prompt to a text file for debugging
-        os.makedirs("data/debug_prompts", exist_ok=True)
-        debug_prompt_path = f"data/debug_prompts/{pdf_paper.arxiv_id}_prompt.txt"
-        with open(debug_prompt_path, "w", encoding="utf-8") as f:
-            f.write(system_prompt)
+        # # Save final prompt to a text file for debugging
+        # os.makedirs("data/debug_prompts", exist_ok=True)
+        # debug_prompt_path = f"data/debug_prompts/{pdf_paper.arxiv_id}_prompt.txt"
+        # with open(debug_prompt_path, "w", encoding="utf-8") as f:
+        #     f.write(system_prompt)
         
         # Log prompt info
         logger.info(f"Analyzing PDF: {pdf_paper.arxiv_id}")
