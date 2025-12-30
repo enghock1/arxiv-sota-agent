@@ -53,7 +53,7 @@ def main(config_yaml: Path):
     PATHS['OUTPUT'].mkdir(parents=True, exist_ok=True)
     
     if results:
-        config_fn = os.path.basename(config_yaml).split(',')[0]
+        config_fn = os.path.basename(config_yaml).replace(".yaml", "")
         df = pd.DataFrame(results).sort_values(by="Metric", ascending=False)
         output_file = PATHS['OUTPUT'] / f"leaderboard-{config_fn}.csv"
         df.to_csv(output_file, index=False)
