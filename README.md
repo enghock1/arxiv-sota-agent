@@ -12,7 +12,7 @@ When tackling a new machine learning problem, practitioners typically start by r
 - "How do different approaches compare quantitatively?"
 - "Which recently published methods have not yet been covered in older reviews?"
 
-Besides, review papers are static and can quickly become outdated. This tool aims to bridge that gap by mining the arXiv database to automate the extraction, structuring, and ranking of methods based on their reported performance metrics. Instead of manually skimming dozens of papers to perform comparative analysis, the goal of this tool is to systematically extract quantitative metrics to help practitioners to make more informed decisions.
+Besides, review papers are static and can quickly become outdated. This tool aims to bridge that gap by mining the arXiv database to automate the extraction, structuring, and ranking of methods based on their reported performance metrics. Instead of manually skimming dozens of papers to perform comparative analysis, the goal is to systematically extract quantitative metrics to help practitioners to make more informed decisions.
 
 
 ## Overview
