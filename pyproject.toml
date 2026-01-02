@@ -20,11 +20,14 @@ dependencies = [
     "pyyaml",
     "tqdm",
     "PyPDF2>=3.0.0",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
     "black",  
     "flake8"
 ]
